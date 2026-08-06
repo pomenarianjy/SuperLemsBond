@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>007 Lems Bond: Super Bond</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+    </style>
+    <!-- Load Phaser 3 Game Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+
+<script>
+// --- GLOBAL VARIABLES & CONFIG ---
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
+
+let globalCoins = 0;
+let currentLevelIndex = 1;
+
+// --- SCENE 1: BOOT & START PAGE ---
+class BootScene extends Phaser.Scene {
+    constructor() { super('BootScene'); }
+
+    preload() {
+        // Core Assets
+        this.load.image('startmariobond', 'startmariobond.png');
+        this.load.image('mariobond', 'mariobond.png');
+        this.load.image('mariobondruntoright', 'mariobondruntoright.png');
+        this.load.image('mariobondruntoleft', 'mariobondruntoleft.png');
+        this.load.image('bondgirl', 'bondgirl.png');
+        this.load.image('bondgirlfinal', 'Bondgirlfinal.png');
+        this.load.image('victory', 'victory.png');
+        this.load.image('interval', 'interval.png');
+        
+        // Items & Boosters
+        this.load.image('Martini', 'Martini.png');
+        this.load.image('Mariogun', 'Mariogun.png');
+        this.load.image('Watch', 'Watch.png');
+        this.load.image('Pen', 'Pen.png');
+        this.load.image('bondcar', 'bondcar.png');
+        this.load.image('bondcoin', 'bondcoin.png');
+        
+        // Enemies
+        this.load.image('LeChiffre', 'LeChiffre.png'); // Goomba
+        this.load.image('MaxDenbigh', 'MaxDenbigh.png'); // Koopa
+        this.load.image('LyutsiferSafin', 'LyutsiferSafin.png'); // Dry Bones
+        this.load.image('DominicGreene', 'DominicGreene.png'); // Piranha
+        this.load.image('ErnstStavroBlofeld', 'ErnstStavroBlofeld.png'); // Swooper
+        this.load.image('RaoulSilva', 'RaoulSilva.png'); // Boss 1
+        this.load.image('MrWhite', 'Mr.White.png'); // Boss 2
+
+        // Environment (Fallbacks generated via graphics if images missing)
+        this.load.image('block', 'block.png');
+        this.load.image('question_block', 'question_block.png');
+        this.load.image('flagpole', 'flagpole.png');
+    }
+
+    create() {
+        // Start Page Logic
+        let bg = this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'startmariobond');
+        let titleText = this.add.text(GAME_WIDTH/2, 100, '007 LEMS BOND: SUPER BOND', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        titleText.setAlpha(0);
+
+        let clickCount = 0;
+        
+        this.input.on('pointerdown', (pointer) => {
+            if (clickCount === 0) {
+                // First click: Flash title
+                this.tweens.add({ targets: titleText, alpha: 1, duration: 500, yoyo: true, repeat: 3 });
+                titleText.setAlpha(1);
+                clickCount++;
+            } else if (clickCount === 1) {
+                // Second click: 3 Bullet holes
+                clickCount++;
+                this.time.delayedCall(100, () => this.add.circle(pointer.x - 50, pointer.y - 50, 30, 0x000000));
+                this.time.delayedCall(400, () => this.add.circle(pointer.x + 80, pointer.y + 20, 30, 0x000000));
+                this.time.delayedCall(700, () => this.add.circle(pointer.x - 20, pointer.y + 80, 30, 0x000000));
+                
+                // White smoke swarming up
+                this.time.delayedCall(1000, () => {
+                    let smoke = this.add.rectangle(GAME_WIDTH/2, GAME_HEIGHT + 300, GAME_WIDTH, GAME_HEIGHT + 200, 0xffffff);
+                    this.tweens.add({
+                        targets: smoke,
+                        y: GAME_HEIGHT / 2,
+                        duration: 2000,
+                        onComplete: () => {
+                            this.scene.start('LevelScene', { level: 1 });
+                        }
+                    });
+                });
+            }
+        });
+    }
+}
+
+// --- SCENE 2: MAIN LEVEL ENGINE ---
+class LevelScene extends Phaser.Scene {
+    constructor() { super('LevelScene'); }
+
+    init(data) {
+        this.levelNum = data.level || 1;
+        this.timeLeft = 180; // 3 minutes
+        this.isGameOver = false;
+        this.playerState = {
+            isBig: false,
+            isInvincible: false,
+            hasWatch: false,
+            hasPen: false,
+            onCar: false
+        };
+    }
+
+    create() {
+        this.cameras.main.setBackgroundColor('#87CEEB'); // Blue skies
+        
+        // UI
+        this.uiCoins = this.add.text(16, 16, 'COINS: ' + globalCoins, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
+        this.uiTime = this.add.text(GAME_WIDTH - 150, 16, 'TIME: 180', { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
+
+        this.time.addEvent({ delay: 1000, callback: () => {
+            if(!this.isGameOver) {
+                this.timeLeft--;
+                this.uiTime.setText('TIME: ' + this.timeLeft);
+                if(this.timeLeft <= 0) this.killPlayer();
+            }
+        }, loop: true });
+
+        // Physics Groups
+        this.platforms = this.physics.add.staticGroup();
+        this.blocks = this.physics.add.staticGroup();
+        this.enemies = this.physics.add.group();
+        this.items = this.physics.add.group();
+        this.projectiles = this.physics.add.group();
+
+        // Generate Level 1-1 (Greenfield Genesis)
+        // 0 = empty, 1 = ground, 2 = ? block, 3 = LeChiffre, 4 = Goal Post
+        const levelData = [
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0],
+            [0,0,0,0,0,2,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
+            [0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        const tileSize = 60;
+        levelData.forEach((row, y) => {
+            row.forEach((tile, x) => {
+                let px = x * tileSize + (tileSize/2);
+                let py = y * tileSize + 200; // Offset down
+                
+                if (tile === 1) {
+                    let ground = this.platforms.create(px, py, 'block').setDisplaySize(tileSize, tileSize).refreshBody();
+                    ground.setTint(0x228B22); // Green grass tint fallback
+                } else if (tile === 2) {
+                    let block = this.blocks.create(px, py, 'question_block').setDisplaySize(tileSize, tileSize).refreshBody();
+                    block.hitCount = 0;
+                    block.maxHits = 1; // Change to 5 for multi-coin bricks
+                } else if (tile === 3) {
+                    let enemy = this.enemies.create(px, py - 20, 'LeChiffre');
+                    enemy.setCollideWorldBounds(true);
+                    enemy.setVelocityX(-50);
+                } else if (tile === 4) {
+                    this.flagpole = this.physics.add.staticSprite(px, py - 100, 'flagpole').setDisplaySize(20, 300).refreshBody();
+                    this.bondgirl = this.add.sprite(px + 40, py - 20, 'bondgirl');
+                }
+            });
+        });
+
+        // Player Setup
+        this.player = this.physics.add.sprite(100, 300, 'mariobond');
+        this.player.setBounce(0.1);
+        this.player.setCollideWorldBounds(false); // Allow falling into pits
+        this.cameras.main.startFollow(this.player);
+        this.cameras.main.setBounds(0, 0, levelData[0].length * tileSize, GAME_HEIGHT);
+        this.physics.world.setBounds(0, 0, levelData[0].length * tileSize, GAME_HEIGHT + 200);
+
+        // Inputs
+        this.cursors = this.input.keyboard.createCursorKeys();
+
+        // Collisions
+        this.physics.add.collider(this.player, this.platforms);
+        this.physics.add.collider(this.enemies, this.platforms);
+        this.physics.add.collider(this.items, this.platforms);
+        this.physics.add.collider(this.player, this.blocks, this.hitBlock, null, this);
+        this.physics.add.overlap(this.player, this.enemies, this.hitEnemy, null, this);
+        this.physics.add.overlap(this.player, this.items, this.collectItem, null, this);
+        this.physics.add.overlap(this.player, this.flagpole, this.reachGoal, null, this);
+        this.physics.add.overlap(this.projectiles, this.enemies, this.shootEnemy, null, this);
+    }
+
+    update() {
+        if (this.isGameOver) return;
+
+        // Player Death by Pit
+        if (this.player.y > GAME_HEIGHT) {
+            this.killPlayer();
+        }
+
+        // Movement & Texture Swapping
+        let speed = this.playerState.onCar ? 250 : (this.playerState.isInvincible ? 200 : 160);
+
+        if (this.cursors.left.isDown) {
+            this.player.setVelocityX(-speed);
+            this.player.setTexture('mariobondruntoleft');
+            this.player.facing = 'left';
+        } else if (this.cursors.right.isDown) {
+            this.player.setVelocityX(speed);
+            this.player.setTexture('mariobondruntoright');
+            this.player.facing = 'right';
+        } else {
+            this.player.setVelocityX(0);
+            this.player.setTexture('mariobond');
+        }
+
+        if (this.cursors.up.isDown && this.player.body.touching.down) {
+            this.player.setVelocityY(-550);
+        }
+
+        // Projectile Shooting (Watch / Pen)
+        if ((this.playerState.hasWatch || this.playerState.hasPen) && Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
+            let proj = this.projectiles.create(this.player.x, this.player.y, 'bondcoin'); // Placeholder for fireball/snowflake
+            proj.setTint(this.playerState.hasWatch ? 0xff4500 : 0x00ffff);
+            proj.body.allowGravity = false;
+            proj.setVelocityX(this.player.facing === 'left' ? -400 : 400);
+        }
+
+        // Enemy Patrol Logic
+        this.enemies.children.iterate((enemy) => {
+            if (enemy && enemy.body) {
+                if (enemy.body.blocked.right) enemy.setVelocityX(-50);
+                else if (enemy.body.blocked.left) enemy.setVelocityX(50);
+            }
+        });
+    }
+
+    hitBlock(player, block) {
+        // Only trigger if hitting from below
+        if (player.body.touching.up && block.body.touching.down) {
+            if (block.hitCount < block.maxHits) {
+                block.hitCount++;
+                
+                // Block bounce animation
+                this.tweens.add({ targets: block, y: block.y - 10, yoyo: true, duration: 100 });
+                
+                // Collect coin
+                this.addCoin(block.x, block.y - 40);
+                
+                if (block.hitCount >= block.maxHits) {
+                    block.setTint(0x8B4513); // Inert brown
+                }
+            }
+        }
+    }
+
+    addCoin(x, y) {
+        let coin = this.add.sprite(x, y, 'bondcoin');
+        this.tweens.add({ targets: coin, y: y - 50, alpha: 0, duration: 500, onComplete: () => coin.destroy() });
+        globalCoins++;
+        this.uiCoins.setText('COINS: ' + globalCoins);
+
+        // The 15-Coin Reward Loop
+        if (globalCoins % 15 === 0) {
+            let car = this.items.create(this.player.x, 0, 'bondcar');
+            car.setBounce(0.2);
+        }
+    }
+
+    collectItem(player, item) {
+        let key = item.texture.key;
+        item.destroy();
+
+        if (key === 'Martini') {
+            this.playerState.isBig = true;
+            this.player.setScale(2);
+            this.time.delayedCall(15000, () => { this.player.setScale(1); this.playerState.isBig = false; });
+        } else if (key === 'Mariogun') {
+            this.playerState.isInvincible = true;
+            this.player.setTint(0xffff00);
+            this.time.delayedCall(15000, () => { this.player.clearTint(); this.playerState.isInvincible = false; });
+        } else if (key === 'Watch') {
+            this.playerState.hasWatch = true;
+        } else if (key === 'Pen') {
+            this.playerState.hasPen = true;
+        } else if (key === 'bondcar') {
+            this.playerState.onCar = true;
+            let carSprite = this.add.sprite(0, 0, 'bondcar');
+            // Mocking mounting logic visually
+            this.time.delayedCall(15000, () => { carSprite.destroy(); this.playerState.onCar = false; });
+        }
+    }
+
+    hitEnemy(player, enemy) {
+        if (this.playerState.isInvincible) {
+            enemy.destroy();
+            return;
+        }
+
+        // Stomp check
+        if (player.body.touching.down && enemy.body.touching.up) {
+            player.setVelocityY(-300); // Bounce
+            enemy.destroy();
+        } else {
+            // Player takes damage
+            if (this.playerState.isBig) {
+                this.playerState.isBig = false;
+                this.player.setScale(1);
+                enemy.destroy(); // Destroy enemy to avoid double hit
+            } else {
+                this.killPlayer();
+            }
+        }
+    }
+
+    shootEnemy(projectile, enemy) {
+        projectile.destroy();
+        if (this.playerState.hasPen) {
+            // Ice logic
+            enemy.setVelocity(0);
+            enemy.setTint(0x00ffff);
+            enemy.alpha = 0.5; // Icecube effect
+            enemy.body.enable = false; // Cannot hurt
+        } else {
+            // Fire logic
+            enemy.destroy();
+        }
+    }
+
+    killPlayer() {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+        this.physics.pause();
+        
+        // Classic Mario Death Animation
+        this.player.setTint(0xff0000);
+        this.time.delayedCall(500, () => {
+            this.physics.resume();
+            this.player.body.checkCollision.none = true;
+            this.player.setVelocityY(-400);
+            this.player.setVelocityX(0);
+        });
+
+        this.time.delayedCall(2000, () => {
+            this.scene.start('GameOverScene');
+        });
+    }
+
+    reachGoal(player, flagpole) {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+        this.physics.pause();
+
+        // Goal post falls
+        this.tweens.add({ targets: flagpole, angle: 90, y: flagpole.y + 100, duration: 1000 });
+
+        // Bondgirl jumps and emits hearts
+        this.tweens.add({ targets: this.bondgirl, y: this.bondgirl.y - 50, yoyo: true, repeat: 5, duration: 300 });
+        
+        // Particle hearts
+        let particles = this.add.particles('bondcoin'); // using coin as fallback for heart
+        particles.createEmitter({
+            x: this.bondgirl.x, y: this.bondgirl.y,
+            speed: { min: -100, max: 100 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1, end: 0 },
+            tint: 0xff69b4, // Pink heart tint
+            blendMode: 'ADD',
+            lifespan: 1000,
+            quantity: 3
+        });
+
+        this.time.delayedCall(3000, () => {
+            if (this.levelNum === 4) {
+                this.scene.start('IntervalScene');
+            } else {
+                // Restart next sublevel (Proof of concept)
+                this.scene.start('LevelScene', { level: this.levelNum + 1 });
+            }
+        });
+    }
+}
+
+// --- SCENE 3: INTERVAL / GAME OVER / VICTORY ---
+class IntervalScene extends Phaser.Scene {
+    constructor() { super('IntervalScene'); }
+    create() {
+        this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'interval');
+        let txt = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2, 'ON TO WORLD TWO', { fontSize: '40px', fill: '#fff' }).setOrigin(0.5);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
+        this.input.on('pointerdown', () => this.scene.start('LevelScene', { level: 5 }));
+    }
+}
+
+class GameOverScene extends Phaser.Scene {
+    constructor() { super('GameOverScene'); }
+    create() {
+        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2, 'GAME OVER', { fontSize: '60px', fill: '#ff0000' }).setOrigin(0.5);
+        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 60, 'Click to Restart', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
+        this.input.on('pointerdown', () => this.scene.start('LevelScene', { level: 1 }));
+    }
+}
+
+// --- GAME INITIALIZATION ---
+const config = {
+    type: Phaser.AUTO,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 1000 },
+            debug: false // Set to true to see hitboxes
+        }
+    },
+    scene: [BootScene, LevelScene, IntervalScene, GameOverScene]
+};
+
+const game = new Phaser.Game(config);
+</script>
+
+</body>
+</html>
