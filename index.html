@@ -72,8 +72,8 @@ class BootScene extends Phaser.Scene {
     }
 
     create() {
-        // Start Page Logic
-        let bg = this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'startmariobond');
+        // Start Page Logic - FIXED: Image now covers the entire screen perfectly
+        let bg = this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'startmariobond').setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
         let titleText = this.add.text(GAME_WIDTH/2, 100, '007 LEMS BOND: SUPER BOND', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         titleText.setAlpha(0);
 
@@ -390,7 +390,7 @@ class LevelScene extends Phaser.Scene {
             if (this.levelNum === 4) {
                 this.scene.start('IntervalScene');
             } else {
-                // Restart next sublevel (Proof of concept)
+                // Restart next sublevel
                 this.scene.start('LevelScene', { level: this.levelNum + 1 });
             }
         });
@@ -437,4 +437,3 @@ const game = new Phaser.Game(config);
 
 </body>
 </html>
-
