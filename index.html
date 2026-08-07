@@ -5,114 +5,268 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>007 Lems Bond: Super Bond</title>
     <style>
-        body {
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        html, body {
             margin: 0;
             padding: 0;
-            background-color: #000;
+            width: 100%;
+            height: 100%;
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+        }
+        #game-container {
             width: 100vw;
-            overflow: hidden;
-            color: white;
-            font-family: 'Courier New', Courier, monospace;
+            height: 100vh;
+            max-width: 1024px;
+            max-height: 768px;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
         }
         canvas {
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
         }
     </style>
-    <!-- Load Phaser 3 Game Engine -->
+    <!-- Phaser 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
 </head>
 <body>
 
+<div id="game-container"></div>
+
 <script>
-// --- GLOBAL VARIABLES & CONFIG ---
+// Global Game State
+let globalCoins = 0;
+let globalScore = 0;
+
+const TILE_SIZE = 40;
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
 
-let globalCoins = 0;
-let currentLevelIndex = 1;
+// Helper to generate fallback textures if image files are missing
+function createFallbackTexture(scene, key, color, width = 40, height = 40, text = '') {
+    if (scene.textures.exists(key) && scene.textures.get(key).key !== '__MISSING') return;
+    const g = scene.make.graphics({ width, height, add: false });
+    g.fillStyle(color, 1);
+    g.fillRect(0, 0, width, height);
+    g.lineStyle(2, 0xffffff, 0.8);
+    g.strokeRect(0, 0, width, height);
+    if (text) {
+        // Simple visual indicator
+        g.fillStyle(0xffffff, 1);
+        g.fillRect(width/4, height/4, width/2, height/2);
+    }
+    g.generateTexture(key, width, height);
+}
 
-// --- SCENE 1: BOOT & START PAGE ---
+// Helper for dynamic heart graphics texture
+function createHeartTexture(scene, key, colorHex) {
+    if (scene.textures.exists(key)) return;
+    const g = scene.make.graphics({ width: 20, height: 20, add: false });
+    g.fillStyle(colorHex, 1);
+    g.beginPath();
+    g.arc(6, 6, 6, Math.PI, 0, false);
+    g.arc(14, 6, 6, Math.PI, 0, false);
+    g.lineTo(20, 10);
+    g.lineTo(10, 19);
+    g.lineTo(0, 10);
+    g.closePath();
+    g.fill();
+    g.generateTexture(key, 20, 20);
+}
+
+// Helper for snowflake texture
+function createSnowflakeTexture(scene, key) {
+    if (scene.textures.exists(key)) return;
+    const g = scene.make.graphics({ width: 16, height: 16, add: false });
+    g.lineStyle(2, 0x00ffff, 1);
+    g.lineBetween(8, 0, 8, 16);
+    g.lineBetween(0, 8, 16, 8);
+    g.lineBetween(2, 2, 14, 14);
+    g.lineBetween(2, 14, 14, 2);
+    g.generateTexture(key, 16, 16);
+}
+
+// Helper for fireball texture
+function createFireballTexture(scene, key) {
+    if (scene.textures.exists(key)) return;
+    const g = scene.make.graphics({ width: 16, height: 16, add: false });
+    g.fillStyle(0xff4500, 1);
+    g.fillCircle(8, 8, 8);
+    g.fillStyle(0xffd700, 1);
+    g.fillCircle(8, 8, 4);
+    g.generateTexture(key, 16, 16);
+}
+
+// --- BOOT SCENE ---
 class BootScene extends Phaser.Scene {
     constructor() { super('BootScene'); }
 
     preload() {
-        // Core Assets
+        // Load Core Assets
         this.load.image('startmariobond', 'startmariobond.png');
         this.load.image('mariobond', 'mariobond.png');
         this.load.image('mariobondruntoright', 'mariobondruntoright.png');
         this.load.image('mariobondruntoleft', 'mariobondruntoleft.png');
         this.load.image('bondgirl', 'bondgirl.png');
-        this.load.image('bondgirlfinal', 'Bondgirlfinal.png');
+        this.load.image('Bondgirlfinal', 'Bondgirlfinal.png');
         this.load.image('victory', 'victory.png');
         this.load.image('interval', 'interval.png');
-        
-        // Items & Boosters
+
+        // Boosters & Items
         this.load.image('Martini', 'Martini.png');
         this.load.image('Mariogun', 'Mariogun.png');
         this.load.image('Watch', 'Watch.png');
         this.load.image('Pen', 'Pen.png');
         this.load.image('bondcar', 'bondcar.png');
         this.load.image('bondcoin', 'bondcoin.png');
-        
-        // Enemies
-        this.load.image('LeChiffre', 'LeChiffre.png'); 
-        this.load.image('MaxDenbigh', 'MaxDenbigh.png'); 
-        this.load.image('LyutsiferSafin', 'LyutsiferSafin.png'); 
-        this.load.image('DominicGreene', 'DominicGreene.png'); 
-        this.load.image('ErnstStavroBlofeld', 'ErnstStavroBlofeld.png'); 
-        this.load.image('RaoulSilva', 'RaoulSilva.png'); 
-        this.load.image('MrWhite', 'Mr.White.png'); 
 
-        // Environment (Fallbacks generated via graphics if images missing)
+        // Enemies & Bosses
+        this.load.image('LeChiffre', 'LeChiffre.png');
+        this.load.image('MaxDenbigh', 'MaxDenbigh.png');
+        this.load.image('LyutsiferSafin', 'LyutsiferSafin.png');
+        this.load.image('DominicGreene', 'DominicGreene.png');
+        this.load.image('ErnstStavroBlofeld', 'ErnstStavroBlofeld.png');
+        this.load.image('RaoulSilva', 'RaoulSilva.png');
+        this.load.image('MrWhite', 'Mr.White.png');
+
+        // Environment
         this.load.image('block', 'block.png');
         this.load.image('question_block', 'question_block.png');
         this.load.image('flagpole', 'flagpole.png');
     }
 
     create() {
-        // 1. Add the background image
+        // Create fallbacks for missing images
+        createFallbackTexture(this, 'startmariobond', 0x111122, GAME_WIDTH, GAME_HEIGHT, 'START');
+        createFallbackTexture(this, 'mariobond', 0x3388ff, 32, 48);
+        createFallbackTexture(this, 'mariobondruntoright', 0x33aaff, 32, 48);
+        createFallbackTexture(this, 'mariobondruntoleft', 0x3355ff, 32, 48);
+        createFallbackTexture(this, 'bondgirl', 0xff66cc, 32, 48);
+        createFallbackTexture(this, 'Bondgirlfinal', 0xff0099, 36, 52);
+        createFallbackTexture(this, 'victory', 0x023020, GAME_WIDTH, GAME_HEIGHT, 'VICTORY');
+        createFallbackTexture(this, 'interval', 0x1a0033, GAME_WIDTH, GAME_HEIGHT, 'INTERVAL');
+
+        createFallbackTexture(this, 'Martini', 0x00ffcc, 24, 24);
+        createFallbackTexture(this, 'Mariogun', 0xffff00, 24, 24);
+        createFallbackTexture(this, 'Watch', 0xff6600, 24, 24);
+        createFallbackTexture(this, 'Pen', 0x00ffff, 24, 24);
+        createFallbackTexture(this, 'bondcar', 0xcc0000, 48, 28);
+        createFallbackTexture(this, 'bondcoin', 0xffd700, 20, 20);
+
+        createFallbackTexture(this, 'LeChiffre', 0x8b4513, 32, 32);
+        createFallbackTexture(this, 'MaxDenbigh', 0x228b22, 32, 32);
+        createFallbackTexture(this, 'LyutsiferSafin', 0xdddddd, 32, 40);
+        createFallbackTexture(this, 'DominicGreene', 0x006600, 32, 48);
+        createFallbackTexture(this, 'ErnstStavroBlofeld', 0x444444, 32, 32);
+        createFallbackTexture(this, 'RaoulSilva', 0xb22222, 50, 60);
+        createFallbackTexture(this, 'MrWhite', 0x4b0082, 60, 70);
+
+        createFallbackTexture(this, 'block', 0x8b5a2b, TILE_SIZE, TILE_SIZE);
+        createFallbackTexture(this, 'question_block', 0xdaa520, TILE_SIZE, TILE_SIZE);
+        createFallbackTexture(this, 'flagpole', 0xcccccc, 12, 240);
+
+        createHeartTexture(this, 'heart_pink', 0xff69b4);
+        createHeartTexture(this, 'heart_red', 0xff0000);
+        createHeartTexture(this, 'heart_cyan', 0x00ffff);
+        createHeartTexture(this, 'heart_yellow', 0xffff00);
+        createHeartTexture(this, 'heart_purple', 0x9900ff);
+
+        createSnowflakeTexture(this, 'snowflake');
+        createFireballTexture(this, 'fireball');
+
+        this.scene.start('StartScene');
+    }
+}
+
+// --- START SCENE ---
+class StartScene extends Phaser.Scene {
+    constructor() { super('StartScene'); }
+
+    create() {
         let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'startmariobond');
-        
-        // 2. Proportional Scaling: Cover the whole screen without squeezing
-        // If the image fails to load (missing file), bg.width will be 0, so we check for that to prevent errors.
         if (bg.width > 0 && bg.height > 0) {
-            let scaleX = GAME_WIDTH / bg.width;
-            let scaleY = GAME_HEIGHT / bg.height;
-            let scale = Math.max(scaleX, scaleY);
+            let scale = Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height);
             bg.setScale(scale);
         }
 
-        let titleText = this.add.text(GAME_WIDTH / 2, 100, '007 LEMS BOND: SUPER BOND', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
-        titleText.setAlpha(0);
+        let titleText = this.add.text(GAME_WIDTH / 2, 120, '007 LEMS BOND\nSUPER BOND', {
+            fontSize: '42px',
+            fill: '#ffffff',
+            fontStyle: 'bold',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5).setAlpha(0);
 
-        let clickCount = 0;
-        
+        let promptText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 80, 'CLICK TO START', {
+            fontSize: '24px',
+            fill: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 5
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: promptText,
+            alpha: 0.2,
+            duration: 600,
+            yoyo: true,
+            repeat: -1
+        });
+
+        let clickState = 0;
+
         this.input.on('pointerdown', (pointer) => {
-            if (clickCount === 0) {
-                // First click: Flash title
-                this.tweens.add({ targets: titleText, alpha: 1, duration: 500, yoyo: true, repeat: 3 });
+            if (clickState === 0) {
+                clickState = 1;
                 titleText.setAlpha(1);
-                clickCount++;
-            } else if (clickCount === 1) {
-                // Second click: 3 Bullet holes
-                clickCount++;
-                this.time.delayedCall(100, () => this.add.circle(pointer.x - 50, pointer.y - 50, 30, 0x000000));
-                this.time.delayedCall(400, () => this.add.circle(pointer.x + 80, pointer.y + 20, 30, 0x000000));
-                this.time.delayedCall(700, () => this.add.circle(pointer.x - 20, pointer.y + 80, 30, 0x000000));
-                
-                // White smoke swarming up
-                this.time.delayedCall(1000, () => {
-                    let smoke = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT + 300, GAME_WIDTH, GAME_HEIGHT + 200, 0xffffff);
+                this.tweens.add({
+                    targets: titleText,
+                    scale: { from: 0.5, to: 1 },
+                    duration: 400,
+                    ease: 'Back.out'
+                });
+                promptText.setText('CLICK TO PROCEED');
+            } else if (clickState === 1) {
+                clickState = 2;
+                promptText.destroy();
+
+                // 3 Big bullet shots onto the screen
+                let shots = [
+                    { x: pointer.x || 300, y: pointer.y || 250, delay: 0 },
+                    { x: (pointer.x || 300) - 150, y: (pointer.y || 250) + 100, delay: 250 },
+                    { x: (pointer.x || 300) + 160, y: (pointer.y || 250) - 80, delay: 500 }
+                ];
+
+                shots.forEach(s => {
+                    this.time.delayedCall(s.delay, () => {
+                        // Black hole with rim
+                        let rim = this.add.circle(s.x, s.y, 45, 0x880000);
+                        let hole = this.add.circle(s.x, s.y, 40, 0x000000);
+                        this.cameras.main.shake(150, 0.015);
+                    });
+                });
+
+                // White smoke swarming up from bottom covering screen
+                this.time.delayedCall(900, () => {
+                    let smoke = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT + 400, GAME_WIDTH, GAME_HEIGHT + 400, 0xffffff);
                     this.tweens.add({
                         targets: smoke,
                         y: GAME_HEIGHT / 2,
-                        duration: 2000,
+                        duration: 1200,
+                        ease: 'Quad.easeInOut',
                         onComplete: () => {
-                            this.scene.start('LevelScene', { level: 1 });
+                            this.scene.start('LevelScene', { world: 1, level: 1 });
                         }
                     });
                 });
@@ -121,14 +275,17 @@ class BootScene extends Phaser.Scene {
     }
 }
 
-// --- SCENE 2: MAIN LEVEL ENGINE ---
+// --- MAIN LEVEL ENGINE SCENE ---
 class LevelScene extends Phaser.Scene {
     constructor() { super('LevelScene'); }
 
     init(data) {
+        this.worldNum = data.world || 1;
         this.levelNum = data.level || 1;
-        this.timeLeft = 180; // 3 minutes
+        this.timeLeft = 180; // 3 minutes per level
         this.isGameOver = false;
+        this.isLevelComplete = false;
+
         this.playerState = {
             isBig: false,
             isInvincible: false,
@@ -136,100 +293,521 @@ class LevelScene extends Phaser.Scene {
             hasPen: false,
             onCar: false
         };
+
+        this.timers = {};
+        this.bossHP = 3;
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#87CEEB'); // Blue skies
-        
-        // UI
-        this.uiCoins = this.add.text(16, 16, 'COINS: ' + globalCoins, { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
-        this.uiTime = this.add.text(GAME_WIDTH - 150, 16, 'TIME: 180', { fontSize: '24px', fill: '#fff' }).setScrollFactor(0);
-
-        this.time.addEvent({ delay: 1000, callback: () => {
-            if(!this.isGameOver) {
-                this.timeLeft--;
-                this.uiTime.setText('TIME: ' + this.timeLeft);
-                if(this.timeLeft <= 0) this.killPlayer();
-            }
-        }, loop: true });
+        this.setupEnvironmentTheme();
 
         // Physics Groups
         this.platforms = this.physics.add.staticGroup();
+        this.icePlatforms = this.physics.add.staticGroup();
         this.blocks = this.physics.add.staticGroup();
+        this.spikes = this.physics.add.staticGroup();
+        this.pipes = this.physics.add.staticGroup();
+        this.lavaPits = this.physics.add.staticGroup();
+
         this.enemies = this.physics.add.group();
+        this.shells = this.physics.add.group();
         this.items = this.physics.add.group();
+        this.coins = this.physics.add.group();
         this.projectiles = this.physics.add.group();
+        this.enemyProjectiles = this.physics.add.group();
+        this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true });
 
-        // Generate Level 1-1 (Greenfield Genesis)
-        // 0 = empty, 1 = ground, 2 = ? block, 3 = LeChiffre, 4 = Goal Post
-        const levelData = [
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0],
-            [0,0,0,0,0,2,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1],
-            [0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-        ];
+        // Map dimensions
+        this.mapWidth = 100 * TILE_SIZE;
+        this.physics.world.setBounds(0, 0, this.mapWidth, GAME_HEIGHT + 200);
 
-        const tileSize = 60;
-        levelData.forEach((row, y) => {
-            row.forEach((tile, x) => {
-                let px = x * tileSize + (tileSize/2);
-                let py = y * tileSize + 200; // Offset down
-                
-                if (tile === 1) {
-                    let ground = this.platforms.create(px, py, 'block').setDisplaySize(tileSize, tileSize).refreshBody();
-                    ground.setTint(0x228B22); // Green grass tint fallback
-                } else if (tile === 2) {
-                    let block = this.blocks.create(px, py, 'question_block').setDisplaySize(tileSize, tileSize).refreshBody();
-                    block.hitCount = 0;
-                    block.maxHits = 1;
-                } else if (tile === 3) {
-                    let enemy = this.enemies.create(px, py - 20, 'LeChiffre');
-                    enemy.setCollideWorldBounds(true);
-                    enemy.setVelocityX(-50);
-                } else if (tile === 4) {
-                    this.flagpole = this.physics.add.staticSprite(px, py - 100, 'flagpole').setDisplaySize(20, 300).refreshBody();
-                    this.bondgirl = this.add.sprite(px + 40, py - 20, 'bondgirl');
-                }
-            });
-        });
+        // Build Level Layout
+        this.buildLevelLayout();
 
         // Player Setup
         this.player = this.physics.add.sprite(100, 300, 'mariobond');
-        this.player.setBounce(0.1);
-        this.player.setCollideWorldBounds(false); // Allow falling into pits
-        this.cameras.main.startFollow(this.player);
-        this.cameras.main.setBounds(0, 0, levelData[0].length * tileSize, GAME_HEIGHT);
-        this.physics.world.setBounds(0, 0, levelData[0].length * tileSize, GAME_HEIGHT + 200);
+        this.player.setCollideWorldBounds(false);
+        this.player.setBounce(0);
+        this.player.facing = 'right';
+
+        // Camera Setup
+        this.cameras.main.setBounds(0, 0, this.mapWidth, GAME_HEIGHT);
+        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
         // Inputs
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.spaceBar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.keyX = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
-        // Collisions
-        this.physics.add.collider(this.player, this.platforms);
+        // Colliders & Overlaps
+        this.physics.add.collider(this.player, this.platforms, null, this.checkIcePlatform, this);
+        this.physics.add.collider(this.player, this.icePlatforms);
+        this.physics.add.collider(this.player, this.movingPlatforms);
         this.physics.add.collider(this.enemies, this.platforms);
+        this.physics.add.collider(this.enemies, this.icePlatforms);
         this.physics.add.collider(this.items, this.platforms);
+        this.physics.add.collider(this.items, this.icePlatforms);
+        this.physics.add.collider(this.shells, this.platforms);
+
         this.physics.add.collider(this.player, this.blocks, this.hitBlock, null, this);
-        this.physics.add.overlap(this.player, this.enemies, this.hitEnemy, null, this);
+        this.physics.add.overlap(this.player, this.enemies, this.handlePlayerEnemyOverlap, null, this);
+        this.physics.add.overlap(this.player, this.shells, this.handlePlayerShellOverlap, null, this);
         this.physics.add.overlap(this.player, this.items, this.collectItem, null, this);
-        this.physics.add.overlap(this.player, this.flagpole, this.reachGoal, null, this);
-        this.physics.add.overlap(this.projectiles, this.enemies, this.shootEnemy, null, this);
-    }
+        this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
+        this.physics.add.overlap(this.player, this.spikes, this.killPlayer, null, this);
+        this.physics.add.overlap(this.player, this.lavaPits, this.killPlayer, null, this);
+        this.physics.add.overlap(this.player, this.enemyProjectiles, this.handleEnemyProjectileHit, null, this);
 
-    update() {
-        if (this.isGameOver) return;
+        this.physics.add.overlap(this.projectiles, this.enemies, this.handleProjectileEnemy, null, this);
+        this.physics.add.overlap(this.shells, this.enemies, this.handleShellEnemy, null, this);
 
-        // Player Death by Pit
-        if (this.player.y > GAME_HEIGHT) {
-            this.killPlayer();
+        if (this.flagpole) {
+            this.physics.add.overlap(this.player, this.flagpole, this.reachGoal, null, this);
         }
 
-        // Movement & Texture Swapping
-        let speed = this.playerState.onCar ? 250 : (this.playerState.isInvincible ? 200 : 160);
+        // Setup UI Header
+        this.setupUI();
 
+        // Level Timer Loop
+        this.time.addEvent({
+            delay: 1000,
+            callback: () => {
+                if (!this.isGameOver && !this.isLevelComplete) {
+                    this.timeLeft--;
+                    this.uiTime.setText('TIME\n' + this.timeLeft);
+                    if (this.timeLeft <= 0) this.killPlayer();
+                }
+            },
+            loop: true
+        });
+    }
+
+    setupEnvironmentTheme() {
+        if (this.worldNum === 1) {
+            if (this.levelNum === 4) {
+                // Castle theme
+                this.cameras.main.setBackgroundColor('#1a0d0d');
+            } else {
+                // Grassland theme
+                this.cameras.main.setBackgroundColor('#5c94fc');
+            }
+        } else {
+            // World 2: Cavern theme
+            if (this.levelNum === 4) {
+                this.cameras.main.setBackgroundColor('#2a0808');
+            } else {
+                this.cameras.main.setBackgroundColor('#1e0f35');
+            }
+        }
+    }
+
+    setupUI() {
+        let style = { fontSize: '18px', fill: '#ffffff', fontStyle: 'bold', stroke: '#000000', strokeThickness: 4, align: 'center' };
+        this.uiScore = this.add.text(20, 15, 'SCORE\n' + globalScore, style).setScrollFactor(0);
+        this.uiCoins = this.add.text(220, 15, 'COINS\n' + globalCoins, style).setScrollFactor(0);
+        this.uiWorld = this.add.text(GAME_WIDTH / 2, 15, `WORLD\n${this.worldNum}-${this.levelNum}`, style).setScrollFactor(0).setOrigin(0.5, 0);
+        this.uiTime = this.add.text(GAME_WIDTH - 80, 15, 'TIME\n' + this.timeLeft, style).setScrollFactor(0);
+    }
+
+    // --- LEVEL BUILDER LOGIC ---
+    buildLevelLayout() {
+        const groundY = 13; // Tile row for ground
+
+        if (this.worldNum === 1) {
+            if (this.levelNum === 1) this.buildLevel1_1(groundY);
+            else if (this.levelNum === 2) this.buildLevel1_2(groundY);
+            else if (this.levelNum === 3) this.buildLevel1_3(groundY);
+            else if (this.levelNum === 4) this.buildLevel1_4(groundY);
+        } else {
+            if (this.levelNum === 1) this.buildLevel2_1(groundY);
+            else if (this.levelNum === 2) this.buildLevel2_2(groundY);
+            else if (this.levelNum === 3) this.buildLevel2_3(groundY);
+            else if (this.levelNum === 4) this.buildLevel2_4(groundY);
+        }
+    }
+
+    // --- LEVEL SPECIFIC MAPS ---
+    buildLevel1_1(gY) {
+        // Greenfield Genesis
+        this.createGroundStrip(0, 15, gY);
+        this.createQuestionBlock(8, gY - 4, 'Martini');
+
+        // Isolated Goomba
+        this.createGroundStrip(17, 35, gY);
+        this.spawnEnemy(24, gY - 1, 'LeChiffre', 'goomba');
+
+        this.createQuestionBlock(20, gY - 4, 'coin');
+        this.createQuestionBlock(22, gY - 4, 'coin', 5); // Multi-coin
+        this.createQuestionBlock(24, gY - 4, 'Watch');
+
+        this.createGroundStrip(38, 70, gY);
+        this.spawnEnemy(42, gY - 1, 'LeChiffre', 'goomba');
+        this.spawnEnemy(48, gY - 1, 'LeChiffre', 'goomba');
+        this.spawnEnemy(52, gY - 1, 'LeChiffre', 'goomba');
+
+        // Floating Arc of Coins
+        this.createCoinArc(30, gY - 3, 5);
+
+        // Step Pyramid leading to Flagpole
+        this.createPyramid(60, gY - 1, 4);
+        this.createGroundStrip(71, 95, gY);
+        this.createFlagpole(80, gY - 1);
+    }
+
+    buildLevel1_2(gY) {
+        // Bouncing Terraces
+        this.createGroundStrip(0, 12, gY);
+
+        // Terraces / Hills
+        this.createBlockRow(12, 16, gY - 2);
+        this.createBlockRow(18, 24, gY - 4);
+        this.createGroundStrip(15, 35, gY);
+
+        this.spawnEnemy(20, gY - 5, 'MaxDenbigh', 'koopa');
+        this.spawnEnemy(28, gY - 1, 'LeChiffre', 'goomba');
+
+        this.createQuestionBlock(21, gY - 7, 'Mariogun'); // Star booster
+        this.createQuestionBlock(23, gY - 7, 'coin');
+
+        this.createGroundStrip(38, 60, gY);
+        this.createBlockRow(42, 48, gY - 3);
+        this.spawnEnemy(44, gY - 4, 'MaxDenbigh', 'koopa');
+        this.spawnEnemy(50, gY - 1, 'LeChiffre', 'goomba');
+
+        this.createPyramid(62, gY - 1, 5);
+        this.createGroundStrip(61, 95, gY);
+        this.createFlagpole(82, gY - 1);
+    }
+
+    buildLevel1_3(gY) {
+        // The Chasm Crossing
+        this.createGroundStrip(0, 10, gY);
+
+        // Moving lifts over pits
+        this.createMovingLift(14 * TILE_SIZE, (gY - 2) * TILE_SIZE, 120, 0);
+        this.createMovingLift(24 * TILE_SIZE, (gY - 1) * TILE_SIZE, 150, 0);
+
+        this.createGroundStrip(30, 42, gY);
+        this.spawnEnemy(34, gY - 1, 'MaxDenbigh', 'paratroopa'); // Paratroopa mid-air stepping stone
+        this.spawnEnemy(38, gY - 1, 'LeChiffre', 'goomba');
+
+        this.createMovingLift(46 * TILE_SIZE, (gY - 3) * TILE_SIZE, 180, 0);
+
+        this.createGroundStrip(55, 72, gY);
+        this.spawnEnemy(60, gY - 1, 'MaxDenbigh', 'paratroopa');
+        this.spawnEnemy(64, gY - 1, 'MaxDenbigh', 'koopa');
+
+        this.createQuestionBlock(35, gY - 4, 'Pen');
+        this.createFlagpole(80, gY - 1);
+        this.createGroundStrip(73, 95, gY);
+    }
+
+    buildLevel1_4(gY) {
+        // Outpost Castle (World 1 Final)
+        this.createGroundStrip(0, 15, gY, 'block', 0x555555);
+
+        // Lava pits
+        this.createLavaPit(15, 22, gY);
+        this.createPodoboo(18 * TILE_SIZE, (gY + 1) * TILE_SIZE);
+
+        this.createGroundStrip(22, 40, gY, 'block', 0x555555);
+        this.spawnEnemy(26, gY - 1, 'LyutsiferSafin', 'drybones');
+        this.spawnEnemy(32, gY - 1, 'MaxDenbigh', 'paratroopa');
+
+        this.createLavaPit(40, 48, gY);
+        this.createPodoboo(44 * TILE_SIZE, (gY + 1) * TILE_SIZE);
+
+        this.createGroundStrip(48, 85, gY, 'block', 0x555555);
+
+        // Boss Arena: Bridge over Lava Pit
+        this.createLavaPit(65, 78, gY);
+        this.bossBridge = this.platforms.create(71.5 * TILE_SIZE, gY * TILE_SIZE + (TILE_SIZE/2), 'block');
+        this.bossBridge.setDisplaySize(13 * TILE_SIZE, TILE_SIZE).refreshBody();
+        this.bossBridge.setTint(0x8b4513);
+
+        // Boss: RaoulSilva
+        this.boss = this.enemies.create(74 * TILE_SIZE, (gY - 2) * TILE_SIZE, 'RaoulSilva');
+        this.boss.setCollideWorldBounds(false);
+        this.boss.isBowser = true;
+        this.boss.setVelocityX(-40);
+
+        // Axe Switch behind boss
+        this.axeSwitch = this.physics.add.staticSprite(80 * TILE_SIZE, (gY - 1) * TILE_SIZE, 'question_block').setTint(0xff0000);
+        this.physics.add.overlap(this.player, this.axeSwitch, this.triggerAxeSwitch, null, this);
+
+        this.createFlagpole(88, gY - 1);
+        this.createGroundStrip(85, 98, gY, 'block', 0x555555);
+    }
+
+    buildLevel2_1(gY) {
+        // Deep Crystal Trench
+        this.createGroundStrip(0, 90, gY, 'block', 0x4b0082);
+
+        // Low ceiling with Ceiling Stone Spikes
+        for (let x = 10; x < 80; x += 2) {
+            let spike = this.spikes.create(x * TILE_SIZE, 3 * TILE_SIZE, 'block').setTint(0x800080);
+            spike.setDisplaySize(TILE_SIZE, TILE_SIZE / 2).refreshBody();
+        }
+
+        // Green Pipes housing Piranha Plants (DominicGreene)
+        this.createPipe(18, gY, 3, true);
+        this.createPipe(28, gY, 4, true);
+
+        // Secret Warp Pipe (Crouching warps to coin grotto)
+        this.secretPipe = this.createPipe(42, gY, 3, false);
+        this.secretPipe.isSecretWarp = true;
+
+        this.createPipe(56, gY, 4, true);
+
+        this.createQuestionBlock(15, gY - 4, 'Watch');
+        this.createQuestionBlock(25, gY - 4, 'Pen');
+
+        this.createFlagpole(85, gY - 1);
+    }
+
+    buildLevel2_2(gY) {
+        // Slippery Stalactites
+        this.createGroundStrip(0, 15, gY);
+
+        // Ice Floors
+        for (let x = 15; x < 70; x++) {
+            let ice = this.icePlatforms.create(x * TILE_SIZE + TILE_SIZE/2, gY * TILE_SIZE + TILE_SIZE/2, 'block').setTint(0x00ffff);
+            ice.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+            ice.friction = 0.01;
+        }
+
+        // Massive downward-sloping ice hill for butt-slide
+        for (let i = 0; i < 8; i++) {
+            let iceHill = this.icePlatforms.create((25 + i) * TILE_SIZE, (gY - i) * TILE_SIZE, 'block').setTint(0x00ffff);
+            iceHill.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+        }
+
+        // Buzzy Beetles cluster at bottom of hill
+        this.spawnEnemy(35, gY - 1, 'LeChiffre', 'buzzybeetle');
+        this.spawnEnemy(38, gY - 1, 'LeChiffre', 'buzzybeetle');
+        this.spawnEnemy(41, gY - 1, 'LeChiffre', 'buzzybeetle');
+
+        this.createGroundStrip(70, 95, gY);
+        this.createFlagpole(85, gY - 1);
+    }
+
+    buildLevel2_3(gY) {
+        // The Midnight Elevators
+        // Pillars over massive pit
+        this.createGroundStrip(0, 8, gY, 'block', 0x2e0854);
+
+        for (let p = 12; p < 70; p += 10) {
+            this.createGroundStrip(p, p + 2, gY, 'block', 0x2e0854);
+            // Motorized Vertical Elevators
+            let lift = this.createMovingLift((p + 5) * TILE_SIZE, (gY - 2) * TILE_SIZE, 0, 150);
+        }
+
+        // Swooper Bats hanging on ceiling
+        this.spawnEnemy(20, 2, 'ErnstStavroBlofeld', 'swooper');
+        this.spawnEnemy(38, 2, 'ErnstStavroBlofeld', 'swooper');
+        this.spawnEnemy(52, 2, 'ErnstStavroBlofeld', 'swooper');
+
+        this.createGroundStrip(72, 95, gY, 'block', 0x2e0854);
+        this.createFlagpole(85, gY - 1);
+    }
+
+    buildLevel2_4(gY) {
+        // Magma Keep (World 2 Grand Finale)
+        this.createGroundStrip(0, 20, gY, 'block', 0x330000);
+
+        // Boss Arena: Flat stone arena
+        this.createGroundStrip(20, 65, gY, 'block', 0x440000);
+
+        // Final Boss: Mecha-Koopa (Mr.White)
+        this.mechaBoss = this.enemies.create(50 * TILE_SIZE, (gY - 3) * TILE_SIZE, 'MrWhite');
+        this.mechaBoss.setScale(1.6);
+        this.mechaBoss.isMechaKoopa = true;
+        this.mechaBoss.setCollideWorldBounds(false);
+
+        // Boss Fireballs timer
+        this.time.addEvent({
+            delay: 2000,
+            callback: () => {
+                if (this.mechaBoss && this.mechaBoss.active) {
+                    let f = this.enemyProjectiles.create(this.mechaBoss.x, this.mechaBoss.y, 'fireball');
+                    f.body.allowGravity = false;
+                    f.setVelocityX(-250);
+                }
+            },
+            loop: true
+        });
+
+        // Boss Leap timer
+        this.time.addEvent({
+            delay: 4000,
+            callback: () => {
+                if (this.mechaBoss && this.mechaBoss.active && this.mechaBoss.body.touching.down) {
+                    this.mechaBoss.setVelocityY(-500);
+                }
+            },
+            loop: true
+        });
+
+        // Bondgirlfinal standing in arena
+        this.bondGirlFinal = this.physics.add.staticSprite(60 * TILE_SIZE, (gY - 1) * TILE_SIZE, 'Bondgirlfinal');
+        this.physics.add.overlap(this.player, this.bondGirlFinal, this.reachFinalGoal, null, this);
+    }
+
+    // --- MAP BUILDING HELPERS ---
+    createGroundStrip(startX, endX, gY, key = 'block', tint = null) {
+        for (let x = startX; x < endX; x++) {
+            for (let y = gY; y < gY + 3; y++) {
+                let b = this.platforms.create(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2, key);
+                b.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+                if (tint) b.setTint(tint);
+            }
+        }
+    }
+
+    createBlockRow(startX, endX, tileY) {
+        for (let x = startX; x < endX; x++) {
+            let b = this.platforms.create(x * TILE_SIZE + TILE_SIZE/2, tileY * TILE_SIZE + TILE_SIZE/2, 'block');
+            b.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+        }
+    }
+
+    createQuestionBlock(x, y, contentType, hits = 1) {
+        let q = this.blocks.create(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2, 'question_block');
+        q.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+        q.contentType = contentType;
+        q.maxHits = hits;
+        q.hitCount = 0;
+    }
+
+    createPyramid(startX, gY, height) {
+        for (let h = 0; h < height; h++) {
+            for (let x = startX + h; x < startX + (height * 2) - h; x++) {
+                let b = this.platforms.create(x * TILE_SIZE + TILE_SIZE/2, (gY - h) * TILE_SIZE + TILE_SIZE/2, 'block');
+                b.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
+            }
+        }
+    }
+
+    createPipe(x, gY, height, hasPiranha) {
+        for (let h = 0; h < height; h++) {
+            let p = this.pipes.create(x * TILE_SIZE + TILE_SIZE/2, (gY - h) * TILE_SIZE + TILE_SIZE/2, 'block').setTint(0x00aa00);
+            p.setDisplaySize(TILE_SIZE * 1.5, TILE_SIZE).refreshBody();
+        }
+        if (hasPiranha) {
+            let piranha = this.enemies.create(x * TILE_SIZE + TILE_SIZE/2, (gY - height) * TILE_SIZE, 'DominicGreene');
+            piranha.isPiranha = true;
+            piranha.body.allowGravity = false;
+            piranha.startY = piranha.y;
+            this.tweens.add({
+                targets: piranha,
+                y: piranha.y - 40,
+                duration: 1500,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+        return this.pipes;
+    }
+
+    createLavaPit(startX, endX, gY) {
+        for (let x = startX; x < endX; x++) {
+            let lava = this.lavaPits.create(x * TILE_SIZE + TILE_SIZE/2, (gY + 1) * TILE_SIZE, 'block').setTint(0xff2200);
+            lava.setDisplaySize(TILE_SIZE, TILE_SIZE * 2).refreshBody();
+        }
+    }
+
+    createPodoboo(x, y) {
+        let p = this.enemies.create(x, y, 'Mariogun').setTint(0xff4500);
+        p.body.allowGravity = false;
+        this.tweens.add({
+            targets: p,
+            y: y - 220,
+            duration: 1200,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Quad.easeOut'
+        });
+    }
+
+    createMovingLift(x, y, rangeX, rangeY) {
+        let lift = this.movingPlatforms.create(x, y, 'block').setTint(0xcccccc);
+        lift.setDisplaySize(TILE_SIZE * 2, TILE_SIZE / 2).refreshBody();
+        if (rangeX > 0) {
+            this.tweens.add({ targets: lift, x: x + rangeX, duration: 2500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
+        if (rangeY > 0) {
+            this.tweens.add({ targets: lift, y: y + rangeY, duration: 2000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
+        return lift;
+    }
+
+    createFlagpole(x, gY) {
+        this.flagpole = this.physics.add.staticSprite(x * TILE_SIZE, (gY - 3) * TILE_SIZE, 'flagpole');
+        this.bondGirl = this.add.sprite((x + 1.5) * TILE_SIZE, (gY - 0.5) * TILE_SIZE, 'bondgirl');
+    }
+
+    createCoinArc(startX, startY, count) {
+        for (let i = 0; i < count; i++) {
+            let arcY = startY - Math.sin((i / (count - 1)) * Math.PI) * 2;
+            let c = this.coins.create((startX + i) * TILE_SIZE, arcY * TILE_SIZE, 'bondcoin');
+            c.body.allowGravity = false;
+        }
+    }
+
+    spawnEnemy(xTile, yTile, texture, type) {
+        let enemy = this.enemies.create(xTile * TILE_SIZE, yTile * TILE_SIZE, texture);
+        enemy.enemyType = type;
+        enemy.setCollideWorldBounds(false);
+
+        if (type === 'goomba' || type === 'koopa' || type === 'buzzybeetle') {
+            enemy.setVelocityX(-40);
+        } else if (type === 'paratroopa') {
+            enemy.body.allowGravity = false;
+            this.tweens.add({ targets: enemy, y: enemy.y - 80, duration: 1200, yoyo: true, repeat: -1 });
+        } else if (type === 'drybones') {
+            enemy.setVelocityX(-30);
+            enemy.isDryBones = true;
+        } else if (type === 'swooper') {
+            enemy.body.allowGravity = false;
+            enemy.isSwooper = true;
+        }
+    }
+
+    // --- UPDATE LOOP ---
+    update() {
+        if (this.isGameOver || this.isLevelComplete) return;
+
+        // Pit Death
+        if (this.player.y > GAME_HEIGHT + 100) {
+            this.killPlayer();
+            return;
+        }
+
+        this.handlePlayerControls();
+        this.handleEnemyAI();
+    }
+
+    handlePlayerControls() {
+        let speed = 180;
+        if (this.playerState.onCar) speed = 320;
+        else if (this.playerState.isInvincible) speed = 260;
+
+        // Crouch Check (Warp Pipe & Butt Slide)
+        if (this.cursors.down.isDown) {
+            if (this.secretPipe && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), this.secretPipe.getBounds())) {
+                this.warpToGrotto();
+                return;
+            }
+            // Butt-slide attack down ice hill
+            if (this.player.body.touching.down) {
+                this.player.setVelocityX(this.player.facing === 'right' ? 300 : -300);
+                this.playerState.isButtSliding = true;
+            }
+        } else {
+            this.playerState.isButtSliding = false;
+        }
+
+        // Horizontal Movement & Texture Swapping
         if (this.cursors.left.isDown) {
             this.player.setVelocityX(-speed);
             this.player.setTexture('mariobondruntoleft');
@@ -239,186 +817,475 @@ class LevelScene extends Phaser.Scene {
             this.player.setTexture('mariobondruntoright');
             this.player.facing = 'right';
         } else {
-            this.player.setVelocityX(0);
+            if (!this.playerState.isButtSliding) this.player.setVelocityX(0);
             this.player.setTexture('mariobond');
         }
 
-        if (this.cursors.up.isDown && this.player.body.touching.down) {
-            this.player.setVelocityY(-550);
+        // Jump
+        if ((this.cursors.up.isDown || this.spaceKey.isDown) && this.player.body.touching.down) {
+            this.player.setVelocityY(-560);
         }
 
-        // Projectile Shooting (Watch / Pen)
-        if ((this.playerState.hasWatch || this.playerState.hasPen) && Phaser.Input.Keyboard.JustDown(this.spaceBar)) {
-            let proj = this.projectiles.create(this.player.x, this.player.y, 'bondcoin'); 
-            proj.setTint(this.playerState.hasWatch ? 0xff4500 : 0x00ffff);
-            proj.body.allowGravity = false;
-            proj.setVelocityX(this.player.facing === 'left' ? -400 : 400);
+        // Shoot Projectile (Watch / Pen)
+        if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.keyX)) && (this.playerState.hasWatch || this.playerState.hasPen)) {
+            this.shootOffensiveTool();
         }
 
-        // Enemy Patrol Logic
+        // Keep Bond Car synced with player position
+        if (this.playerState.onCar && this.carSprite) {
+            this.carSprite.x = this.player.x;
+            this.carSprite.y = this.player.y + 10;
+        }
+    }
+
+    shootOffensiveTool() {
+        let key = this.playerState.hasWatch ? 'fireball' : 'snowflake';
+        let proj = this.projectiles.create(this.player.x, this.player.y, key);
+        proj.body.allowGravity = false;
+        proj.isWatchLaser = this.playerState.hasWatch;
+        proj.isPenSnowflake = this.playerState.hasPen;
+        proj.setVelocityX(this.player.facing === 'right' ? 450 : -450);
+
+        this.time.delayedCall(2000, () => { if (proj.active) proj.destroy(); });
+    }
+
+    handleEnemyAI() {
         this.enemies.children.iterate((enemy) => {
-            if (enemy && enemy.body) {
-                if (enemy.body.blocked.right) enemy.setVelocityX(-50);
-                else if (enemy.body.blocked.left) enemy.setVelocityX(50);
+            if (!enemy || !enemy.active || !enemy.body) return;
+
+            // Turn around on wall collisions
+            if (enemy.body.blocked.right) enemy.setVelocityX(-Math.abs(enemy.body.velocity.x || 40));
+            else if (enemy.body.blocked.left) enemy.setVelocityX(Math.abs(enemy.body.velocity.x || 40));
+
+            // Swooper Bat dive bomb behavior
+            if (enemy.isSwooper && !enemy.isDiving) {
+                if (Math.abs(enemy.x - this.player.x) < 200) {
+                    enemy.isDiving = true;
+                    this.physics.moveToObject(enemy, this.player, 200);
+                }
+            }
+        });
+
+        // Shell movement logic
+        this.shells.children.iterate((shell) => {
+            if (shell && shell.active && shell.isKicked) {
+                if (shell.body.blocked.right || shell.body.blocked.left) {
+                    shell.setVelocityX(-shell.body.velocity.x);
+                }
             }
         });
     }
 
+    // --- INTERACTION HANDLERS ---
     hitBlock(player, block) {
         if (player.body.touching.up && block.body.touching.down) {
             if (block.hitCount < block.maxHits) {
                 block.hitCount++;
-                this.tweens.add({ targets: block, y: block.y - 10, yoyo: true, duration: 100 });
-                this.addCoin(block.x, block.y - 40);
+
+                // Block hit animation
+                this.tweens.add({ targets: block, y: block.y - 12, yoyo: true, duration: 100 });
+
+                if (block.contentType === 'coin') {
+                    this.spawnCoinReward(block.x, block.y - TILE_SIZE);
+                } else if (block.contentType) {
+                    this.spawnItem(block.x, block.y - TILE_SIZE, block.contentType);
+                }
+
                 if (block.hitCount >= block.maxHits) {
-                    block.setTint(0x8B4513); // Inert brown
+                    block.setTint(0x664422); // Turn brown inert
                 }
             }
         }
     }
 
-    addCoin(x, y) {
+    spawnCoinReward(x, y) {
         let coin = this.add.sprite(x, y, 'bondcoin');
-        this.tweens.add({ targets: coin, y: y - 50, alpha: 0, duration: 500, onComplete: () => coin.destroy() });
-        globalCoins++;
-        this.uiCoins.setText('COINS: ' + globalCoins);
+        this.tweens.add({ targets: coin, y: y - 40, alpha: 0, duration: 400, onComplete: () => coin.destroy() });
+        this.addCoin();
+    }
 
+    addCoin() {
+        globalCoins++;
+        globalScore += 100;
+        this.uiCoins.setText('COINS\n' + globalCoins);
+        this.uiScore.setText('SCORE\n' + globalScore);
+
+        // 15-Coin Reward Loop -> Award Bond Car!
         if (globalCoins % 15 === 0) {
-            let car = this.items.create(this.player.x, 0, 'bondcar');
-            car.setBounce(0.2);
+            this.spawnItem(this.player.x, this.player.y - 80, 'bondcar');
         }
+    }
+
+    spawnItem(x, y, key) {
+        let item = this.items.create(x, y, key);
+        item.setBounce(0.2);
+        item.setVelocityY(-150);
     }
 
     collectItem(player, item) {
         let key = item.texture.key;
         item.destroy();
 
+        globalScore += 500;
+        this.uiScore.setText('SCORE\n' + globalScore);
+
         if (key === 'Martini') {
+            // Super Mushroom: 2x size for 15s
             this.playerState.isBig = true;
             this.player.setScale(2);
-            this.time.delayedCall(15000, () => { this.player.setScale(1); this.playerState.isBig = false; });
+            this.clearTimer('martini');
+            this.timers.martini = this.time.delayedCall(15000, () => {
+                this.player.setScale(1);
+                this.playerState.isBig = false;
+            });
         } else if (key === 'Mariogun') {
+            // Super Star: Invincible for 15s
             this.playerState.isInvincible = true;
             this.player.setTint(0xffff00);
-            this.time.delayedCall(15000, () => { this.player.clearTint(); this.playerState.isInvincible = false; });
+            this.clearTimer('star');
+            this.timers.star = this.time.delayedCall(15000, () => {
+                this.player.clearTint();
+                this.playerState.isInvincible = false;
+            });
         } else if (key === 'Watch') {
             this.playerState.hasWatch = true;
+            this.playerState.hasPen = false;
         } else if (key === 'Pen') {
             this.playerState.hasPen = true;
+            this.playerState.hasWatch = false;
         } else if (key === 'bondcar') {
-            this.playerState.onCar = true;
-            let carSprite = this.add.sprite(0, 0, 'bondcar');
-            this.time.delayedCall(15000, () => { carSprite.destroy(); this.playerState.onCar = false; });
+            // Yoshi Egg / Mountable vehicle: 15s faster speed
+            if (!this.playerState.onCar) {
+                this.playerState.onCar = true;
+                this.carSprite = this.add.sprite(player.x, player.y, 'bondcar');
+                this.clearTimer('car');
+                this.timers.car = this.time.delayedCall(15000, () => {
+                    if (this.carSprite) this.carSprite.destroy();
+                    this.playerState.onCar = false;
+                });
+            }
         }
     }
 
-    hitEnemy(player, enemy) {
-        if (this.playerState.isInvincible) {
-            enemy.destroy();
+    collectCoin(player, coin) {
+        coin.destroy();
+        this.addCoin();
+    }
+
+    handlePlayerEnemyOverlap(player, enemy) {
+        // Invincible or Butt-sliding plows through enemy
+        if (this.playerState.isInvincible || this.playerState.isButtSliding) {
+            this.killEnemy(enemy);
             return;
         }
 
+        // Stomping Enemy
         if (player.body.touching.down && enemy.body.touching.up) {
-            player.setVelocityY(-300);
-            enemy.destroy();
+            player.setVelocityY(-350);
+
+            if (enemy.isMechaKoopa) {
+                this.bossHP--;
+                if (this.bossHP <= 0) {
+                    this.killEnemy(enemy);
+                }
+            } else if (enemy.enemyType === 'koopa') {
+                // Turn into shell
+                enemy.destroy();
+                let shell = this.shells.create(enemy.x, enemy.y, 'MaxDenbigh').setTint(0x00ff00);
+                shell.isShell = true;
+                shell.isKicked = false;
+            } else if (enemy.isDryBones) {
+                // Collapses & revives after 4 seconds
+                enemy.disableBody(true, true);
+                this.time.delayedCall(4000, () => {
+                    if (enemy && enemy.active) enemy.enableBody(true, enemy.x, enemy.y, true, true);
+                });
+            } else {
+                this.killEnemy(enemy);
+            }
         } else {
+            // Player takes hit
             if (this.playerState.isBig) {
                 this.playerState.isBig = false;
                 this.player.setScale(1);
-                enemy.destroy(); 
+                // Temporary invincibility flicker
+                this.playerState.isInvincible = true;
+                this.time.delayedCall(1000, () => this.playerState.isInvincible = false);
             } else {
                 this.killPlayer();
             }
         }
     }
 
-    shootEnemy(projectile, enemy) {
-        projectile.destroy();
-        if (this.playerState.hasPen) {
-            enemy.setVelocity(0);
-            enemy.setTint(0x00ffff);
-            enemy.alpha = 0.5; 
-            enemy.body.enable = false; 
+    handlePlayerShellOverlap(player, shell) {
+        if (!shell.isKicked) {
+            shell.isKicked = true;
+            shell.setVelocityX(player.facing === 'right' ? 400 : -400);
         } else {
-            enemy.destroy();
+            if (!player.body.touching.down) {
+                this.killPlayer();
+            }
         }
     }
 
-    killPlayer() {
-        if (this.isGameOver) return;
-        this.isGameOver = true;
-        this.physics.pause();
-        
-        this.player.setTint(0xff0000);
-        this.time.delayedCall(500, () => {
-            this.physics.resume();
-            this.player.body.checkCollision.none = true;
-            this.player.setVelocityY(-400);
-            this.player.setVelocityX(0);
-        });
+    handleProjectileEnemy(proj, enemy) {
+        if (enemy.enemyType === 'buzzybeetle' && proj.isWatchLaser) {
+            // Buzzy Beetle is fire-proof!
+            proj.destroy();
+            return;
+        }
 
-        this.time.delayedCall(2000, () => {
-            this.scene.start('GameOverScene');
+        if (proj.isPenSnowflake) {
+            // Freeze enemy in semi-transparent ice cube
+            proj.destroy();
+            enemy.setVelocity(0);
+            enemy.setTint(0x00ffff);
+            enemy.alpha = 0.6;
+            enemy.isFrozen = true;
+            enemy.body.enable = false; // Cannot hurt player
+        } else {
+            proj.destroy();
+            this.killEnemy(enemy);
+        }
+    }
+
+    handleShellEnemy(shell, enemy) {
+        if (shell.isKicked) {
+            this.killEnemy(enemy);
+        }
+    }
+
+    handleEnemyProjectileHit(player, proj) {
+        proj.destroy();
+        this.killPlayer();
+    }
+
+    killEnemy(enemy) {
+        globalScore += 200;
+        this.uiScore.setText('SCORE\n' + globalScore);
+        enemy.destroy();
+    }
+
+    warpToGrotto() {
+        // Secret Coin Grotto
+        this.cameras.main.fadeOut(300);
+        this.time.delayedCall(300, () => {
+            this.player.setPosition(100, 100);
+            // Create grid of coins
+            for (let rx = 0; rx < 8; rx++) {
+                for (let ry = 0; ry < 4; ry++) {
+                    let c = this.coins.create(150 + rx * 30, 150 + ry * 30, 'bondcoin');
+                    c.body.allowGravity = false;
+                }
+            }
+            this.cameras.main.fadeIn(300);
         });
+    }
+
+    triggerAxeSwitch() {
+        if (this.axeSwitchTriggered) return;
+        this.axeSwitchTriggered = true;
+
+        // Collapse bridge under Bowser (RaoulSilva)
+        if (this.bossBridge) this.bossBridge.destroy();
+        if (this.boss) {
+            this.boss.setVelocityY(200);
+            this.time.delayedCall(1000, () => this.boss.destroy());
+        }
     }
 
     reachGoal(player, flagpole) {
-        if (this.isGameOver) return;
-        this.isGameOver = true;
+        if (this.isLevelComplete) return;
+        this.isLevelComplete = true;
+
         this.physics.pause();
 
-        this.tweens.add({ targets: flagpole, angle: 90, y: flagpole.y + 100, duration: 1000 });
-        this.tweens.add({ targets: this.bondgirl, y: this.bondgirl.y - 50, yoyo: true, repeat: 5, duration: 300 });
-        
-        let particles = this.add.particles('bondcoin'); 
-        particles.createEmitter({
-            x: this.bondgirl.x, y: this.bondgirl.y,
-            speed: { min: -100, max: 100 },
-            angle: { min: 0, max: 360 },
+        // Goal post falls over & Bondgirl jumps up and down
+        this.tweens.add({ targets: flagpole, angle: 90, duration: 600 });
+        this.tweens.add({ targets: this.bondGirl, y: this.bondGirl.y - 40, duration: 300, yoyo: true, repeat: 5 });
+
+        // Pink hearts exuding consecutively from her back
+        let heartsEmitter = this.add.particles('heart_pink');
+        heartsEmitter.createEmitter({
+            x: this.bondGirl.x,
+            y: this.bondGirl.y - 20,
+            speed: { min: 50, max: 150 },
+            angle: { min: 220, max: 320 },
             scale: { start: 1, end: 0 },
-            tint: 0xff69b4, 
-            blendMode: 'ADD',
-            lifespan: 1000,
-            quantity: 3
+            lifespan: 1200,
+            frequency: 150
         });
 
         this.time.delayedCall(3000, () => {
-            if (this.levelNum === 4) {
+            if (this.worldNum === 1 && this.levelNum === 4) {
                 this.scene.start('IntervalScene');
             } else {
-                this.scene.start('LevelScene', { level: this.levelNum + 1 });
+                let nextLevel = this.levelNum + 1;
+                this.scene.start('LevelScene', { world: this.worldNum, level: nextLevel });
             }
+        });
+    }
+
+    reachFinalGoal(player, bondgirl) {
+        if (this.isLevelComplete) return;
+        this.isLevelComplete = true;
+
+        this.physics.pause();
+
+        // Bondgirlfinal issues multi-colored hearts consecutively
+        let colors = ['heart_pink', 'heart_red', 'heart_cyan', 'heart_yellow', 'heart_purple'];
+        colors.forEach((cKey) => {
+            let emitter = this.add.particles(cKey);
+            emitter.createEmitter({
+                x: bondgirl.x,
+                y: bondgirl.y - 20,
+                speed: { min: 80, max: 200 },
+                angle: { min: 0, max: 360 },
+                scale: { start: 1.2, end: 0 },
+                lifespan: 1500,
+                frequency: 200
+            });
+        });
+
+        let winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'VICTORY!\nCLICK TO CONTINUE', {
+            fontSize: '36px',
+            fill: '#ffd700',
+            fontStyle: 'bold',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setScrollFactor(0).setOrigin(0.5);
+
+        this.input.once('pointerdown', () => {
+            this.scene.start('VictoryScene');
+        });
+    }
+
+    // --- CLASSIC MARIO DEATH ANIMATION ---
+    killPlayer() {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+
+        this.physics.pause();
+        this.player.setTint(0xff0000);
+
+        // Pause -> Lift high -> Drop all the way down off screen
+        this.tweens.timeline({
+            targets: this.player,
+            tweens: [
+                { y: this.player.y, duration: 300 }, // Paused
+                { y: this.player.y - 120, duration: 500, ease: 'Quad.easeOut' }, // Lifted high
+                { y: GAME_HEIGHT + 200, duration: 800, ease: 'Quad.easeIn' } // Dropped off screen
+            ],
+            onComplete: () => {
+                this.showGameOverUI();
+            }
+        });
+    }
+
+    showGameOverUI() {
+        let goText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, 'GAME OVER', {
+            fontSize: '54px',
+            fill: '#ff0000',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setScrollFactor(0).setOrigin(0.5);
+
+        let restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Click to Restart Level', {
+            fontSize: '22px',
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setScrollFactor(0).setOrigin(0.5);
+
+        this.input.once('pointerdown', () => {
+            this.scene.restart({ world: this.worldNum, level: this.levelNum });
+        });
+    }
+
+    clearTimer(key) {
+        if (this.timers[key]) {
+            this.timers[key].remove();
+            this.timers[key] = null;
+        }
+    }
+}
+
+// --- INTERVAL SCENE ---
+class IntervalScene extends Phaser.Scene {
+    constructor() { super('IntervalScene'); }
+
+    create() {
+        let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'interval');
+        if (bg.width > 0 && bg.height > 0) {
+            bg.setScale(Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height));
+        }
+
+        let flashText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'On to World Two', {
+            fontSize: '48px',
+            fill: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: flashText,
+            alpha: 0,
+            duration: 400,
+            yoyo: true,
+            repeat: -1
+        });
+
+        this.input.once('pointerdown', () => {
+            this.scene.start('LevelScene', { world: 2, level: 1 });
         });
     }
 }
 
-// --- SCENE 3: INTERVAL / GAME OVER / VICTORY ---
-class IntervalScene extends Phaser.Scene {
-    constructor() { super('IntervalScene'); }
+// --- VICTORY SCENE ---
+class VictoryScene extends Phaser.Scene {
+    constructor() { super('VictoryScene'); }
+
     create() {
-        this.add.image(GAME_WIDTH/2, GAME_HEIGHT/2, 'interval');
-        let txt = this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2, 'ON TO WORLD TWO', { fontSize: '40px', fill: '#fff' }).setOrigin(0.5);
-        this.tweens.add({ targets: txt, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
-        this.input.on('pointerdown', () => this.scene.start('LevelScene', { level: 5 }));
+        let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'victory');
+        if (bg.width > 0 && bg.height > 0) {
+            bg.setScale(Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height));
+        }
+
+        this.add.text(GAME_WIDTH / 2, 100, '007 LEMS BOND: SUPER BOND', {
+            fontSize: '36px',
+            fill: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 100, `FINAL SCORE: ${globalScore}\nTOTAL COINS: ${globalCoins}`, {
+            fontSize: '28px',
+            fill: '#ffffff',
+            align: 'center',
+            stroke: '#000000',
+            strokeThickness: 5
+        }).setOrigin(0.5);
+
+        this.input.once('pointerdown', () => {
+            globalCoins = 0;
+            globalScore = 0;
+            this.scene.start('StartScene');
+        });
     }
 }
 
-class GameOverScene extends Phaser.Scene {
-    constructor() { super('GameOverScene'); }
-    create() {
-        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2, 'GAME OVER', { fontSize: '60px', fill: '#ff0000' }).setOrigin(0.5);
-        this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 60, 'Click to Restart', { fontSize: '20px', fill: '#fff' }).setOrigin(0.5);
-        this.input.on('pointerdown', () => this.scene.start('LevelScene', { level: 1 }));
-    }
-}
-
-// --- GAME INITIALIZATION ---
+// --- PHASER GAME CONFIGURATION ---
 const config = {
     type: Phaser.AUTO,
+    parent: 'game-container',
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     scale: {
-        mode: Phaser.Scale.FIT, // This ensures the game stretches to fill the screen
+        mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
     physics: {
@@ -428,11 +1295,10 @@ const config = {
             debug: false
         }
     },
-    scene: [BootScene, LevelScene, IntervalScene, GameOverScene]
+    scene: [BootScene, StartScene, LevelScene, IntervalScene, VictoryScene]
 };
 
 const game = new Phaser.Game(config);
 </script>
-
 </body>
 </html>
