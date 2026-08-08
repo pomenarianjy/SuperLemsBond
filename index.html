@@ -14,7 +14,7 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            background-color: #050505;
+            background-color: #000000;
             color: #ffffff;
             font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
@@ -61,14 +61,12 @@ function createFallbackTexture(scene, key, color, width = 40, height = 40, text 
     g.lineStyle(2, 0xffffff, 0.8);
     g.strokeRect(0, 0, width, height);
     if (text) {
-        // Simple visual indicator
         g.fillStyle(0xffffff, 1);
         g.fillRect(width/4, height/4, width/2, height/2);
     }
     g.generateTexture(key, width, height);
 }
 
-// Helper for dynamic heart graphics texture
 function createHeartTexture(scene, key, colorHex) {
     if (scene.textures.exists(key)) return;
     const g = scene.make.graphics({ width: 20, height: 20, add: false });
@@ -84,7 +82,6 @@ function createHeartTexture(scene, key, colorHex) {
     g.generateTexture(key, 20, 20);
 }
 
-// Helper for snowflake texture
 function createSnowflakeTexture(scene, key) {
     if (scene.textures.exists(key)) return;
     const g = scene.make.graphics({ width: 16, height: 16, add: false });
@@ -96,7 +93,6 @@ function createSnowflakeTexture(scene, key) {
     g.generateTexture(key, 16, 16);
 }
 
-// Helper for fireball texture
 function createFireballTexture(scene, key) {
     if (scene.textures.exists(key)) return;
     const g = scene.make.graphics({ width: 16, height: 16, add: false });
@@ -112,7 +108,6 @@ class BootScene extends Phaser.Scene {
     constructor() { super('BootScene'); }
 
     preload() {
-        // Load Core Assets
         this.load.image('startmariobond', 'startmariobond.png');
         this.load.image('mariobond', 'mariobond.png');
         this.load.image('mariobondruntoright', 'mariobondruntoright.png');
@@ -122,7 +117,6 @@ class BootScene extends Phaser.Scene {
         this.load.image('victory', 'victory.png');
         this.load.image('interval', 'interval.png');
 
-        // Boosters & Items
         this.load.image('Martini', 'Martini.png');
         this.load.image('Mariogun', 'Mariogun.png');
         this.load.image('Watch', 'Watch.png');
@@ -130,7 +124,6 @@ class BootScene extends Phaser.Scene {
         this.load.image('bondcar', 'bondcar.png');
         this.load.image('bondcoin', 'bondcoin.png');
 
-        // Enemies & Bosses
         this.load.image('LeChiffre', 'LeChiffre.png');
         this.load.image('MaxDenbigh', 'MaxDenbigh.png');
         this.load.image('LyutsiferSafin', 'LyutsiferSafin.png');
@@ -139,14 +132,12 @@ class BootScene extends Phaser.Scene {
         this.load.image('RaoulSilva', 'RaoulSilva.png');
         this.load.image('MrWhite', 'Mr.White.png');
 
-        // Environment
         this.load.image('block', 'block.png');
         this.load.image('question_block', 'question_block.png');
         this.load.image('flagpole', 'flagpole.png');
     }
 
     create() {
-        // Create fallbacks for missing images
         createFallbackTexture(this, 'startmariobond', 0x111122, GAME_WIDTH, GAME_HEIGHT, 'START');
         createFallbackTexture(this, 'mariobond', 0x3388ff, 32, 48);
         createFallbackTexture(this, 'mariobondruntoright', 0x33aaff, 32, 48);
@@ -193,11 +184,9 @@ class StartScene extends Phaser.Scene {
     constructor() { super('StartScene'); }
 
     create() {
+        // Enforce full canvas coverage from top-to-bottom and side-to-side
         let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'startmariobond');
-        if (bg.width > 0 && bg.height > 0) {
-            let scale = Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height);
-            bg.setScale(scale);
-        }
+        bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 
         let titleText = this.add.text(GAME_WIDTH / 2, 120, '007 LEMS BOND\nSUPER BOND', {
             fontSize: '42px',
@@ -241,7 +230,6 @@ class StartScene extends Phaser.Scene {
                 clickState = 2;
                 promptText.destroy();
 
-                // 3 Big bullet shots onto the screen
                 let shots = [
                     { x: pointer.x || 300, y: pointer.y || 250, delay: 0 },
                     { x: (pointer.x || 300) - 150, y: (pointer.y || 250) + 100, delay: 250 },
@@ -250,14 +238,12 @@ class StartScene extends Phaser.Scene {
 
                 shots.forEach(s => {
                     this.time.delayedCall(s.delay, () => {
-                        // Black hole with rim
                         let rim = this.add.circle(s.x, s.y, 45, 0x880000);
                         let hole = this.add.circle(s.x, s.y, 40, 0x000000);
                         this.cameras.main.shake(150, 0.015);
                     });
                 });
 
-                // White smoke swarming up from bottom covering screen
                 this.time.delayedCall(900, () => {
                     let smoke = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT + 400, GAME_WIDTH, GAME_HEIGHT + 400, 0xffffff);
                     this.tweens.add({
@@ -282,7 +268,7 @@ class LevelScene extends Phaser.Scene {
     init(data) {
         this.worldNum = data.world || 1;
         this.levelNum = data.level || 1;
-        this.timeLeft = 180; // 3 minutes per level
+        this.timeLeft = 180;
         this.isGameOver = false;
         this.isLevelComplete = false;
 
@@ -301,7 +287,6 @@ class LevelScene extends Phaser.Scene {
     create() {
         this.setupEnvironmentTheme();
 
-        // Physics Groups
         this.platforms = this.physics.add.staticGroup();
         this.icePlatforms = this.physics.add.staticGroup();
         this.blocks = this.physics.add.staticGroup();
@@ -317,30 +302,24 @@ class LevelScene extends Phaser.Scene {
         this.enemyProjectiles = this.physics.add.group();
         this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true });
 
-        // Map dimensions
         this.mapWidth = 100 * TILE_SIZE;
         this.physics.world.setBounds(0, 0, this.mapWidth, GAME_HEIGHT + 200);
 
-        // Build Level Layout
         this.buildLevelLayout();
 
-        // Player Setup
         this.player = this.physics.add.sprite(100, 300, 'mariobond');
         this.player.setCollideWorldBounds(false);
         this.player.setBounce(0);
         this.player.facing = 'right';
 
-        // Camera Setup
         this.cameras.main.setBounds(0, 0, this.mapWidth, GAME_HEIGHT);
         this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
-        // Inputs
         this.cursors = this.input.keyboard.createCursorKeys();
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.keyX = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
-        // Colliders & Overlaps
-        this.physics.add.collider(this.player, this.platforms, null, this.checkIcePlatform, this);
+        this.physics.add.collider(this.player, this.platforms);
         this.physics.add.collider(this.player, this.icePlatforms);
         this.physics.add.collider(this.player, this.movingPlatforms);
         this.physics.add.collider(this.enemies, this.platforms);
@@ -365,10 +344,8 @@ class LevelScene extends Phaser.Scene {
             this.physics.add.overlap(this.player, this.flagpole, this.reachGoal, null, this);
         }
 
-        // Setup UI Header
         this.setupUI();
 
-        // Level Timer Loop
         this.time.addEvent({
             delay: 1000,
             callback: () => {
@@ -385,14 +362,11 @@ class LevelScene extends Phaser.Scene {
     setupEnvironmentTheme() {
         if (this.worldNum === 1) {
             if (this.levelNum === 4) {
-                // Castle theme
                 this.cameras.main.setBackgroundColor('#1a0d0d');
             } else {
-                // Grassland theme
                 this.cameras.main.setBackgroundColor('#5c94fc');
             }
         } else {
-            // World 2: Cavern theme
             if (this.levelNum === 4) {
                 this.cameras.main.setBackgroundColor('#2a0808');
             } else {
@@ -409,9 +383,8 @@ class LevelScene extends Phaser.Scene {
         this.uiTime = this.add.text(GAME_WIDTH - 80, 15, 'TIME\n' + this.timeLeft, style).setScrollFactor(0);
     }
 
-    // --- LEVEL BUILDER LOGIC ---
     buildLevelLayout() {
-        const groundY = 13; // Tile row for ground
+        const groundY = 13;
 
         if (this.worldNum === 1) {
             if (this.levelNum === 1) this.buildLevel1_1(groundY);
@@ -426,18 +399,15 @@ class LevelScene extends Phaser.Scene {
         }
     }
 
-    // --- LEVEL SPECIFIC MAPS ---
     buildLevel1_1(gY) {
-        // Greenfield Genesis
         this.createGroundStrip(0, 15, gY);
         this.createQuestionBlock(8, gY - 4, 'Martini');
 
-        // Isolated Goomba
         this.createGroundStrip(17, 35, gY);
         this.spawnEnemy(24, gY - 1, 'LeChiffre', 'goomba');
 
         this.createQuestionBlock(20, gY - 4, 'coin');
-        this.createQuestionBlock(22, gY - 4, 'coin', 5); // Multi-coin
+        this.createQuestionBlock(22, gY - 4, 'coin', 5);
         this.createQuestionBlock(24, gY - 4, 'Watch');
 
         this.createGroundStrip(38, 70, gY);
@@ -445,20 +415,16 @@ class LevelScene extends Phaser.Scene {
         this.spawnEnemy(48, gY - 1, 'LeChiffre', 'goomba');
         this.spawnEnemy(52, gY - 1, 'LeChiffre', 'goomba');
 
-        // Floating Arc of Coins
         this.createCoinArc(30, gY - 3, 5);
 
-        // Step Pyramid leading to Flagpole
         this.createPyramid(60, gY - 1, 4);
         this.createGroundStrip(71, 95, gY);
         this.createFlagpole(80, gY - 1);
     }
 
     buildLevel1_2(gY) {
-        // Bouncing Terraces
         this.createGroundStrip(0, 12, gY);
 
-        // Terraces / Hills
         this.createBlockRow(12, 16, gY - 2);
         this.createBlockRow(18, 24, gY - 4);
         this.createGroundStrip(15, 35, gY);
@@ -466,7 +432,7 @@ class LevelScene extends Phaser.Scene {
         this.spawnEnemy(20, gY - 5, 'MaxDenbigh', 'koopa');
         this.spawnEnemy(28, gY - 1, 'LeChiffre', 'goomba');
 
-        this.createQuestionBlock(21, gY - 7, 'Mariogun'); // Star booster
+        this.createQuestionBlock(21, gY - 7, 'Mariogun');
         this.createQuestionBlock(23, gY - 7, 'coin');
 
         this.createGroundStrip(38, 60, gY);
@@ -480,15 +446,13 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel1_3(gY) {
-        // The Chasm Crossing
         this.createGroundStrip(0, 10, gY);
 
-        // Moving lifts over pits
         this.createMovingLift(14 * TILE_SIZE, (gY - 2) * TILE_SIZE, 120, 0);
         this.createMovingLift(24 * TILE_SIZE, (gY - 1) * TILE_SIZE, 150, 0);
 
         this.createGroundStrip(30, 42, gY);
-        this.spawnEnemy(34, gY - 1, 'MaxDenbigh', 'paratroopa'); // Paratroopa mid-air stepping stone
+        this.spawnEnemy(34, gY - 1, 'MaxDenbigh', 'paratroopa');
         this.spawnEnemy(38, gY - 1, 'LeChiffre', 'goomba');
 
         this.createMovingLift(46 * TILE_SIZE, (gY - 3) * TILE_SIZE, 180, 0);
@@ -503,10 +467,8 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel1_4(gY) {
-        // Outpost Castle (World 1 Final)
         this.createGroundStrip(0, 15, gY, 'block', 0x555555);
 
-        // Lava pits
         this.createLavaPit(15, 22, gY);
         this.createPodoboo(18 * TILE_SIZE, (gY + 1) * TILE_SIZE);
 
@@ -519,19 +481,16 @@ class LevelScene extends Phaser.Scene {
 
         this.createGroundStrip(48, 85, gY, 'block', 0x555555);
 
-        // Boss Arena: Bridge over Lava Pit
         this.createLavaPit(65, 78, gY);
         this.bossBridge = this.platforms.create(71.5 * TILE_SIZE, gY * TILE_SIZE + (TILE_SIZE/2), 'block');
         this.bossBridge.setDisplaySize(13 * TILE_SIZE, TILE_SIZE).refreshBody();
         this.bossBridge.setTint(0x8b4513);
 
-        // Boss: RaoulSilva
         this.boss = this.enemies.create(74 * TILE_SIZE, (gY - 2) * TILE_SIZE, 'RaoulSilva');
         this.boss.setCollideWorldBounds(false);
         this.boss.isBowser = true;
         this.boss.setVelocityX(-40);
 
-        // Axe Switch behind boss
         this.axeSwitch = this.physics.add.staticSprite(80 * TILE_SIZE, (gY - 1) * TILE_SIZE, 'question_block').setTint(0xff0000);
         this.physics.add.overlap(this.player, this.axeSwitch, this.triggerAxeSwitch, null, this);
 
@@ -540,20 +499,16 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel2_1(gY) {
-        // Deep Crystal Trench
         this.createGroundStrip(0, 90, gY, 'block', 0x4b0082);
 
-        // Low ceiling with Ceiling Stone Spikes
         for (let x = 10; x < 80; x += 2) {
             let spike = this.spikes.create(x * TILE_SIZE, 3 * TILE_SIZE, 'block').setTint(0x800080);
             spike.setDisplaySize(TILE_SIZE, TILE_SIZE / 2).refreshBody();
         }
 
-        // Green Pipes housing Piranha Plants (DominicGreene)
         this.createPipe(18, gY, 3, true);
         this.createPipe(28, gY, 4, true);
 
-        // Secret Warp Pipe (Crouching warps to coin grotto)
         this.secretPipe = this.createPipe(42, gY, 3, false);
         this.secretPipe.isSecretWarp = true;
 
@@ -566,23 +521,19 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel2_2(gY) {
-        // Slippery Stalactites
         this.createGroundStrip(0, 15, gY);
 
-        // Ice Floors
         for (let x = 15; x < 70; x++) {
             let ice = this.icePlatforms.create(x * TILE_SIZE + TILE_SIZE/2, gY * TILE_SIZE + TILE_SIZE/2, 'block').setTint(0x00ffff);
             ice.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
             ice.friction = 0.01;
         }
 
-        // Massive downward-sloping ice hill for butt-slide
         for (let i = 0; i < 8; i++) {
             let iceHill = this.icePlatforms.create((25 + i) * TILE_SIZE, (gY - i) * TILE_SIZE, 'block').setTint(0x00ffff);
             iceHill.setDisplaySize(TILE_SIZE, TILE_SIZE).refreshBody();
         }
 
-        // Buzzy Beetles cluster at bottom of hill
         this.spawnEnemy(35, gY - 1, 'LeChiffre', 'buzzybeetle');
         this.spawnEnemy(38, gY - 1, 'LeChiffre', 'buzzybeetle');
         this.spawnEnemy(41, gY - 1, 'LeChiffre', 'buzzybeetle');
@@ -592,17 +543,13 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel2_3(gY) {
-        // The Midnight Elevators
-        // Pillars over massive pit
         this.createGroundStrip(0, 8, gY, 'block', 0x2e0854);
 
         for (let p = 12; p < 70; p += 10) {
             this.createGroundStrip(p, p + 2, gY, 'block', 0x2e0854);
-            // Motorized Vertical Elevators
             let lift = this.createMovingLift((p + 5) * TILE_SIZE, (gY - 2) * TILE_SIZE, 0, 150);
         }
 
-        // Swooper Bats hanging on ceiling
         this.spawnEnemy(20, 2, 'ErnstStavroBlofeld', 'swooper');
         this.spawnEnemy(38, 2, 'ErnstStavroBlofeld', 'swooper');
         this.spawnEnemy(52, 2, 'ErnstStavroBlofeld', 'swooper');
@@ -612,19 +559,15 @@ class LevelScene extends Phaser.Scene {
     }
 
     buildLevel2_4(gY) {
-        // Magma Keep (World 2 Grand Finale)
         this.createGroundStrip(0, 20, gY, 'block', 0x330000);
 
-        // Boss Arena: Flat stone arena
         this.createGroundStrip(20, 65, gY, 'block', 0x440000);
 
-        // Final Boss: Mecha-Koopa (Mr.White)
         this.mechaBoss = this.enemies.create(50 * TILE_SIZE, (gY - 3) * TILE_SIZE, 'MrWhite');
         this.mechaBoss.setScale(1.6);
         this.mechaBoss.isMechaKoopa = true;
         this.mechaBoss.setCollideWorldBounds(false);
 
-        // Boss Fireballs timer
         this.time.addEvent({
             delay: 2000,
             callback: () => {
@@ -637,7 +580,6 @@ class LevelScene extends Phaser.Scene {
             loop: true
         });
 
-        // Boss Leap timer
         this.time.addEvent({
             delay: 4000,
             callback: () => {
@@ -648,12 +590,10 @@ class LevelScene extends Phaser.Scene {
             loop: true
         });
 
-        // Bondgirlfinal standing in arena
         this.bondGirlFinal = this.physics.add.staticSprite(60 * TILE_SIZE, (gY - 1) * TILE_SIZE, 'Bondgirlfinal');
         this.physics.add.overlap(this.player, this.bondGirlFinal, this.reachFinalGoal, null, this);
     }
 
-    // --- MAP BUILDING HELPERS ---
     createGroundStrip(startX, endX, gY, key = 'block', tint = null) {
         for (let x = startX; x < endX; x++) {
             for (let y = gY; y < gY + 3; y++) {
@@ -773,11 +713,9 @@ class LevelScene extends Phaser.Scene {
         }
     }
 
-    // --- UPDATE LOOP ---
     update() {
         if (this.isGameOver || this.isLevelComplete) return;
 
-        // Pit Death
         if (this.player.y > GAME_HEIGHT + 100) {
             this.killPlayer();
             return;
@@ -792,13 +730,11 @@ class LevelScene extends Phaser.Scene {
         if (this.playerState.onCar) speed = 320;
         else if (this.playerState.isInvincible) speed = 260;
 
-        // Crouch Check (Warp Pipe & Butt Slide)
         if (this.cursors.down.isDown) {
             if (this.secretPipe && Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(), this.secretPipe.getBounds())) {
                 this.warpToGrotto();
                 return;
             }
-            // Butt-slide attack down ice hill
             if (this.player.body.touching.down) {
                 this.player.setVelocityX(this.player.facing === 'right' ? 300 : -300);
                 this.playerState.isButtSliding = true;
@@ -807,7 +743,6 @@ class LevelScene extends Phaser.Scene {
             this.playerState.isButtSliding = false;
         }
 
-        // Horizontal Movement & Texture Swapping
         if (this.cursors.left.isDown) {
             this.player.setVelocityX(-speed);
             this.player.setTexture('mariobondruntoleft');
@@ -821,17 +756,14 @@ class LevelScene extends Phaser.Scene {
             this.player.setTexture('mariobond');
         }
 
-        // Jump
         if ((this.cursors.up.isDown || this.spaceKey.isDown) && this.player.body.touching.down) {
             this.player.setVelocityY(-560);
         }
 
-        // Shoot Projectile (Watch / Pen)
         if ((Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.keyX)) && (this.playerState.hasWatch || this.playerState.hasPen)) {
             this.shootOffensiveTool();
         }
 
-        // Keep Bond Car synced with player position
         if (this.playerState.onCar && this.carSprite) {
             this.carSprite.x = this.player.x;
             this.carSprite.y = this.player.y + 10;
@@ -853,11 +785,9 @@ class LevelScene extends Phaser.Scene {
         this.enemies.children.iterate((enemy) => {
             if (!enemy || !enemy.active || !enemy.body) return;
 
-            // Turn around on wall collisions
             if (enemy.body.blocked.right) enemy.setVelocityX(-Math.abs(enemy.body.velocity.x || 40));
             else if (enemy.body.blocked.left) enemy.setVelocityX(Math.abs(enemy.body.velocity.x || 40));
 
-            // Swooper Bat dive bomb behavior
             if (enemy.isSwooper && !enemy.isDiving) {
                 if (Math.abs(enemy.x - this.player.x) < 200) {
                     enemy.isDiving = true;
@@ -866,7 +796,6 @@ class LevelScene extends Phaser.Scene {
             }
         });
 
-        // Shell movement logic
         this.shells.children.iterate((shell) => {
             if (shell && shell.active && shell.isKicked) {
                 if (shell.body.blocked.right || shell.body.blocked.left) {
@@ -876,13 +805,10 @@ class LevelScene extends Phaser.Scene {
         });
     }
 
-    // --- INTERACTION HANDLERS ---
     hitBlock(player, block) {
         if (player.body.touching.up && block.body.touching.down) {
             if (block.hitCount < block.maxHits) {
                 block.hitCount++;
-
-                // Block hit animation
                 this.tweens.add({ targets: block, y: block.y - 12, yoyo: true, duration: 100 });
 
                 if (block.contentType === 'coin') {
@@ -892,7 +818,7 @@ class LevelScene extends Phaser.Scene {
                 }
 
                 if (block.hitCount >= block.maxHits) {
-                    block.setTint(0x664422); // Turn brown inert
+                    block.setTint(0x664422);
                 }
             }
         }
@@ -910,7 +836,6 @@ class LevelScene extends Phaser.Scene {
         this.uiCoins.setText('COINS\n' + globalCoins);
         this.uiScore.setText('SCORE\n' + globalScore);
 
-        // 15-Coin Reward Loop -> Award Bond Car!
         if (globalCoins % 15 === 0) {
             this.spawnItem(this.player.x, this.player.y - 80, 'bondcar');
         }
@@ -930,7 +855,6 @@ class LevelScene extends Phaser.Scene {
         this.uiScore.setText('SCORE\n' + globalScore);
 
         if (key === 'Martini') {
-            // Super Mushroom: 2x size for 15s
             this.playerState.isBig = true;
             this.player.setScale(2);
             this.clearTimer('martini');
@@ -939,7 +863,6 @@ class LevelScene extends Phaser.Scene {
                 this.playerState.isBig = false;
             });
         } else if (key === 'Mariogun') {
-            // Super Star: Invincible for 15s
             this.playerState.isInvincible = true;
             this.player.setTint(0xffff00);
             this.clearTimer('star');
@@ -954,7 +877,6 @@ class LevelScene extends Phaser.Scene {
             this.playerState.hasPen = true;
             this.playerState.hasWatch = false;
         } else if (key === 'bondcar') {
-            // Yoshi Egg / Mountable vehicle: 15s faster speed
             if (!this.playerState.onCar) {
                 this.playerState.onCar = true;
                 this.carSprite = this.add.sprite(player.x, player.y, 'bondcar');
@@ -973,13 +895,11 @@ class LevelScene extends Phaser.Scene {
     }
 
     handlePlayerEnemyOverlap(player, enemy) {
-        // Invincible or Butt-sliding plows through enemy
         if (this.playerState.isInvincible || this.playerState.isButtSliding) {
             this.killEnemy(enemy);
             return;
         }
 
-        // Stomping Enemy
         if (player.body.touching.down && enemy.body.touching.up) {
             player.setVelocityY(-350);
 
@@ -989,13 +909,11 @@ class LevelScene extends Phaser.Scene {
                     this.killEnemy(enemy);
                 }
             } else if (enemy.enemyType === 'koopa') {
-                // Turn into shell
                 enemy.destroy();
                 let shell = this.shells.create(enemy.x, enemy.y, 'MaxDenbigh').setTint(0x00ff00);
                 shell.isShell = true;
                 shell.isKicked = false;
             } else if (enemy.isDryBones) {
-                // Collapses & revives after 4 seconds
                 enemy.disableBody(true, true);
                 this.time.delayedCall(4000, () => {
                     if (enemy && enemy.active) enemy.enableBody(true, enemy.x, enemy.y, true, true);
@@ -1004,11 +922,9 @@ class LevelScene extends Phaser.Scene {
                 this.killEnemy(enemy);
             }
         } else {
-            // Player takes hit
             if (this.playerState.isBig) {
                 this.playerState.isBig = false;
                 this.player.setScale(1);
-                // Temporary invincibility flicker
                 this.playerState.isInvincible = true;
                 this.time.delayedCall(1000, () => this.playerState.isInvincible = false);
             } else {
@@ -1030,19 +946,17 @@ class LevelScene extends Phaser.Scene {
 
     handleProjectileEnemy(proj, enemy) {
         if (enemy.enemyType === 'buzzybeetle' && proj.isWatchLaser) {
-            // Buzzy Beetle is fire-proof!
             proj.destroy();
             return;
         }
 
         if (proj.isPenSnowflake) {
-            // Freeze enemy in semi-transparent ice cube
             proj.destroy();
             enemy.setVelocity(0);
             enemy.setTint(0x00ffff);
             enemy.alpha = 0.6;
             enemy.isFrozen = true;
-            enemy.body.enable = false; // Cannot hurt player
+            enemy.body.enable = false;
         } else {
             proj.destroy();
             this.killEnemy(enemy);
@@ -1067,11 +981,9 @@ class LevelScene extends Phaser.Scene {
     }
 
     warpToGrotto() {
-        // Secret Coin Grotto
         this.cameras.main.fadeOut(300);
         this.time.delayedCall(300, () => {
             this.player.setPosition(100, 100);
-            // Create grid of coins
             for (let rx = 0; rx < 8; rx++) {
                 for (let ry = 0; ry < 4; ry++) {
                     let c = this.coins.create(150 + rx * 30, 150 + ry * 30, 'bondcoin');
@@ -1086,7 +998,6 @@ class LevelScene extends Phaser.Scene {
         if (this.axeSwitchTriggered) return;
         this.axeSwitchTriggered = true;
 
-        // Collapse bridge under Bowser (RaoulSilva)
         if (this.bossBridge) this.bossBridge.destroy();
         if (this.boss) {
             this.boss.setVelocityY(200);
@@ -1100,11 +1011,9 @@ class LevelScene extends Phaser.Scene {
 
         this.physics.pause();
 
-        // Goal post falls over & Bondgirl jumps up and down
         this.tweens.add({ targets: flagpole, angle: 90, duration: 600 });
         this.tweens.add({ targets: this.bondGirl, y: this.bondGirl.y - 40, duration: 300, yoyo: true, repeat: 5 });
 
-        // Pink hearts exuding consecutively from her back
         let heartsEmitter = this.add.particles('heart_pink');
         heartsEmitter.createEmitter({
             x: this.bondGirl.x,
@@ -1132,7 +1041,6 @@ class LevelScene extends Phaser.Scene {
 
         this.physics.pause();
 
-        // Bondgirlfinal issues multi-colored hearts consecutively
         let colors = ['heart_pink', 'heart_red', 'heart_cyan', 'heart_yellow', 'heart_purple'];
         colors.forEach((cKey) => {
             let emitter = this.add.particles(cKey);
@@ -1161,7 +1069,6 @@ class LevelScene extends Phaser.Scene {
         });
     }
 
-    // --- CLASSIC MARIO DEATH ANIMATION ---
     killPlayer() {
         if (this.isGameOver) return;
         this.isGameOver = true;
@@ -1169,13 +1076,12 @@ class LevelScene extends Phaser.Scene {
         this.physics.pause();
         this.player.setTint(0xff0000);
 
-        // Pause -> Lift high -> Drop all the way down off screen
         this.tweens.timeline({
             targets: this.player,
             tweens: [
-                { y: this.player.y, duration: 300 }, // Paused
-                { y: this.player.y - 120, duration: 500, ease: 'Quad.easeOut' }, // Lifted high
-                { y: GAME_HEIGHT + 200, duration: 800, ease: 'Quad.easeIn' } // Dropped off screen
+                { y: this.player.y, duration: 300 },
+                { y: this.player.y - 120, duration: 500, ease: 'Quad.easeOut' },
+                { y: GAME_HEIGHT + 200, duration: 800, ease: 'Quad.easeIn' }
             ],
             onComplete: () => {
                 this.showGameOverUI();
@@ -1218,9 +1124,7 @@ class IntervalScene extends Phaser.Scene {
 
     create() {
         let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'interval');
-        if (bg.width > 0 && bg.height > 0) {
-            bg.setScale(Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height));
-        }
+        bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 
         let flashText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'On to World Two', {
             fontSize: '48px',
@@ -1250,9 +1154,7 @@ class VictoryScene extends Phaser.Scene {
 
     create() {
         let bg = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'victory');
-        if (bg.width > 0 && bg.height > 0) {
-            bg.setScale(Math.max(GAME_WIDTH / bg.width, GAME_HEIGHT / bg.height));
-        }
+        bg.setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 
         this.add.text(GAME_WIDTH / 2, 100, '007 LEMS BOND: SUPER BOND', {
             fontSize: '36px',
